@@ -78,6 +78,7 @@
             <label>Monto<input name="amount" type="number" step="0.01" required></label>
             <label>Fecha<input name="date" type="date" required></label>
             <label>Categoría<select name="category" required></select></label>
+            <label>Lote (opcional)<input name="batch" placeholder="Ej: Suscripción, colegio"></label>
             <label>Repetición<select name="repeat">
               <option value="none">No repite</option>
               <option value="monthly">Repite mes a mes</option>
@@ -95,6 +96,7 @@
             <label>Monto<input name="amount" type="number" step="0.01" required></label>
             <label>Fecha<input name="date" type="date" required></label>
             <label>Categoría<select name="category" required></select></label>
+            <label>Lote (opcional)<input name="batch" placeholder="Ej: Suscripción, colegio"></label>
             <label>Repetición<select name="repeat">
               <option value="none">No repite</option>
               <option value="monthly">Repite mes a mes</option>
@@ -166,9 +168,11 @@
           <label>Monto<input name="amount" type="number" step="0.01" required></label>
           <label>Fecha<input name="date" type="date" required></label>
           <label>Categoría<select name="category" required></select></label>
+          <label>Lote (opcional)<input name="batch" placeholder="Ej: Suscripción deportiva"></label>
           <label>Notas<textarea name="notes" rows="2"></textarea></label>
           <div class="editor-actions">
             <button type="submit">Guardar cambios</button>
+            <button type="button" id="deleteBatch" class="ghost danger hidden">Borrar lote</button>
             <button type="button" id="deleteEntry" class="ghost danger">Borrar</button>
           </div>
         </form>
@@ -243,8 +247,23 @@
           <button type="button" id="resetAll" class="ghost danger">Borrar todo</button>
           <button type="button" id="resetExpenses" class="ghost danger">Borrar gastos</button>
           <button type="button" id="resetIncomes" class="ghost">Borrar ingresos</button>
+          <button type="button" id="resetExpenseCategories" class="ghost">Borrar categorías de gastos</button>
+          <button type="button" id="resetIncomeCategories" class="ghost">Borrar categorías de ingresos</button>
         </div>
         <p class="muted">Las acciones piden confirmación para evitar borrados accidentales.</p>
+      </div>
+
+      <div class="form-card">
+        <h3>Backup y restauración</h3>
+        <p class="muted">Descargá un backup de tus datos o restauralo cuando lo necesites.</p>
+        <div class="button-row">
+          <button type="button" id="downloadBackup">Descargar backup</button>
+          <label class="file-label">
+            <input type="file" id="restoreFile" accept="application/json" class="hidden">
+            <span class="ghost">Restaurar backup</span>
+          </label>
+        </div>
+        <textarea id="backupPreview" rows="4" readonly placeholder="Acá vas a ver un resumen del backup generado"></textarea>
       </div>
     </section>
   </main>
