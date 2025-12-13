@@ -1,6 +1,13 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const DEFAULT_CURRENCY = '$';
+
+function normalizeEntry(entry) {
+  return {
+    ...entry,
+    batchId: entry.batchId || ''
+  };
+}
 
 let state = loadState();
 let currentMonth = new Date();
@@ -32,6 +39,7 @@ function loadState() {
     const parsed = JSON.parse(saved);
     return {
       ...parsed,
+      entries: Array.isArray(parsed.entries) ? parsed.entries.map(normalizeEntry) : [],
       incomeCategories: parsed.incomeCategories ? [...parsed.incomeCategories] : (parsed.categories ? [...parsed.categories] : []),
       expenseCategories: parsed.expenseCategories ? [...parsed.expenseCategories] : (parsed.categories ? [...parsed.categories] : []),
       currency: DEFAULT_CURRENCY
@@ -62,7 +70,7 @@ function seedData() {
 
   sample.forEach((item, idx) => entries.push({ ...item, id: idx + 1, date: toInputDate(item.date) }));
 
-  const initial = { entries, incomeCategories, expenseCategories, currency: DEFAULT_CURRENCY, theme: 'light' };
+  const initial = { entries: entries.map(normalizeEntry), incomeCategories, expenseCategories, currency: DEFAULT_CURRENCY, theme: 'light' };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
@@ -113,6 +121,7 @@ function bindForms() {
   document.getElementById('rankingTo').addEventListener('change', renderRanking);
   document.getElementById('editForm').addEventListener('submit', handleEditSubmit);
   document.getElementById('deleteEntry').addEventListener('click', handleDeleteEntry);
+  document.getElementById('deleteBatch').addEventListener('click', handleDeleteBatch);
   document.querySelector('#editForm select[name="type"]').addEventListener('change', e => updateEditCategoryOptions(e.target.value));
   ['expenseForm','incomeForm'].forEach(id => {
     const form = document.getElementById(id);
@@ -144,6 +153,10 @@ function bindControls() {
   document.getElementById('resetAll').addEventListener('click', () => handleReset('all'));
   document.getElementById('resetExpenses').addEventListener('click', () => handleReset('expense'));
   document.getElementById('resetIncomes').addEventListener('click', () => handleReset('income'));
+  document.getElementById('resetExpenseCategories').addEventListener('click', () => handleReset('expenseCategories'));
+  document.getElementById('resetIncomeCategories').addEventListener('click', () => handleReset('incomeCategories'));
+  document.getElementById('downloadBackup').addEventListener('click', downloadBackup);
+  document.getElementById('restoreFile').addEventListener('change', restoreFromFile);
 }
 
 function setTodayDefaults() {
@@ -160,6 +173,7 @@ function addEntriesFromForm(form, type) {
   const category = data.get('category');
   const repeat = data.get('repeat');
   const repeatCount = Math.max(1, Number(data.get('repeatCount') || 1));
+  const batch = (data.get('batch') || '').trim();
   const notes = data.get('notes').trim();
 
   if (!description || !amount || !date || !category) {
@@ -175,19 +189,20 @@ function addEntriesFromForm(form, type) {
 
   const entriesToAdd = [];
   const baseDate = new Date(date + 'T00:00:00');
+  const batchId = batch || (repeat !== 'none' ? generateBatchId() : '');
 
   if (repeat === 'none') {
-    entriesToAdd.push(createEntry({ type, description, amount, date, category, notes }));
+    entriesToAdd.push(createEntry({ type, description, amount, date, category, notes, batchId }));
   } else if (repeat === 'monthly') {
     for (let i = 0; i < repeatCount; i++) {
       const targetDate = shiftMonths(baseDate, i);
-      entriesToAdd.push(createEntry({ type, description, amount, date: toInputDate(targetDate), category, notes: annotate(notes, `Repetición ${i+1}/${repeatCount}`) }));
+      entriesToAdd.push(createEntry({ type, description, amount, date: toInputDate(targetDate), category, notes: annotate(notes, `Repetición ${i+1}/${repeatCount}`), batchId }));
     }
   } else if (repeat === 'installments') {
     const installmentAmount = +(amount / repeatCount).toFixed(2);
     for (let i = 0; i < repeatCount; i++) {
       const targetDate = shiftMonths(baseDate, i);
-      entriesToAdd.push(createEntry({ type, description: `${description} (cuota ${i+1}/${repeatCount})`, amount: installmentAmount, date: toInputDate(targetDate), category, notes: annotate(notes, 'Cuotas') }));
+      entriesToAdd.push(createEntry({ type, description: `${description} (cuota ${i+1}/${repeatCount})`, amount: installmentAmount, date: toInputDate(targetDate), category, notes: annotate(notes, 'Cuotas'), batchId }));
     }
   }
 
@@ -201,7 +216,7 @@ function addEntriesFromForm(form, type) {
   showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
 }
 
-function createEntry({ type, description, amount, date, category, notes }) {
+function createEntry({ type, description, amount, date, category, notes, batchId = '' }) {
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + Math.random(),
     type,
@@ -209,12 +224,17 @@ function createEntry({ type, description, amount, date, category, notes }) {
     amount: Number(amount),
     date,
     category,
-    notes
+    notes,
+    batchId
   };
 }
 
 function annotate(notes, extra) {
   return notes ? `${notes} · ${extra}` : extra;
+}
+
+function generateBatchId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `batch-${Date.now()}`;
 }
 
 function showMessage(text, type = 'success') {
@@ -297,6 +317,13 @@ function populateCategorySelect(select, categories, includePlaceholder = false, 
     if (cat === current) option.selected = true;
     select.appendChild(option);
   });
+  if (current && !categories.includes(current)) {
+    const missing = document.createElement('option');
+    missing.value = current;
+    missing.textContent = `${current} (eliminada)`;
+    select.appendChild(missing);
+    missing.selected = true;
+  }
 }
 
 function renderCategoryChips(type) {
@@ -506,9 +533,11 @@ function openEditor(entryId) {
   form.amount.value = entry.amount;
   form.date.value = entry.date;
   form.notes.value = entry.notes || '';
+  form.batch.value = entry.batchId || '';
   form.type.value = entry.type;
   updateEditCategoryOptions(entry.type, entry.category);
   document.getElementById('editorId').textContent = entryId;
+  updateBatchDeleteButton(entry);
   document.getElementById('entryEditor').classList.remove('hidden');
   document.getElementById('entryEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
   form.description.focus();
@@ -532,6 +561,7 @@ function handleEditSubmit(e) {
   const date = data.get('date');
   const category = data.get('category');
   const type = data.get('type');
+  const batchId = (data.get('batch') || '').trim();
   const notes = data.get('notes').trim();
   if (!description || !amount || !date || !category || !type) {
     showMessage('Completá todos los campos del registro.', 'error');
@@ -544,11 +574,26 @@ function handleEditSubmit(e) {
   }
   const entry = state.entries.find(e => e.id === selectedEntryId);
   if (!entry) return;
-  Object.assign(entry, { description, amount: Number(amount), date, category, type, notes });
+  Object.assign(entry, { description, amount: Number(amount), date, category, type, notes, batchId });
   saveState();
   refreshUI();
   openEditor(selectedEntryId);
   showMessage('Registro actualizado.', 'success');
+}
+
+function updateBatchDeleteButton(entry) {
+  const btn = document.getElementById('deleteBatch');
+  if (!btn) return;
+  const hasBatch = !!entry.batchId;
+  if (!hasBatch) {
+    btn.classList.add('hidden');
+    btn.dataset.batchId = '';
+    return;
+  }
+  const siblings = state.entries.filter(e => e.batchId === entry.batchId);
+  btn.classList.toggle('hidden', !hasBatch);
+  btn.dataset.batchId = entry.batchId;
+  btn.textContent = siblings.length > 1 ? `Borrar lote (${siblings.length})` : 'Borrar lote';
 }
 
 function handleDeleteEntry() {
@@ -560,6 +605,21 @@ function handleDeleteEntry() {
   document.getElementById('entryEditor').classList.add('hidden');
   refreshUI();
   showMessage('Registro eliminado.', 'success');
+}
+
+function handleDeleteBatch() {
+  const btn = document.getElementById('deleteBatch');
+  const batchId = btn?.dataset.batchId;
+  if (!batchId) return;
+  const related = state.entries.filter(e => e.batchId === batchId);
+  if (!related.length) return;
+  if (!confirm(`¿Seguro que querés borrar los ${related.length} registros de este lote?`)) return;
+  state.entries = state.entries.filter(e => e.batchId !== batchId);
+  saveState();
+  selectedEntryId = null;
+  document.getElementById('entryEditor').classList.add('hidden');
+  refreshUI();
+  showMessage('Lote eliminado.', 'success');
 }
 
 function openEntryFromShortcut(entryId) {
@@ -605,21 +665,90 @@ function clearSearchText() {
 
 function handleReset(type) {
   const prompts = {
-    all: '¿Seguro que querés borrar TODOS los movimientos? Esta acción no se puede deshacer.',
+    all: '¿Seguro que querés borrar TODOS los movimientos y categorías? Esta acción no se puede deshacer.',
     expense: '¿Seguro que querés borrar solo los gastos? Esta acción no se puede deshacer.',
-    income: '¿Seguro que querés borrar solo los ingresos? Esta acción no se puede deshacer.'
+    income: '¿Seguro que querés borrar solo los ingresos? Esta acción no se puede deshacer.',
+    expenseCategories: '¿Seguro que querés borrar todas las categorías de gastos?',
+    incomeCategories: '¿Seguro que querés borrar todas las categorías de ingresos?'
   };
   if (!confirm(prompts[type])) return;
   if (type === 'all') {
     state.entries = [];
-  } else {
+    state.incomeCategories = [];
+    state.expenseCategories = [];
+  } else if (type === 'expense') {
     state.entries = state.entries.filter(e => e.type !== type);
+  } else if (type === 'income') {
+    state.entries = state.entries.filter(e => e.type !== type);
+  } else if (type === 'expenseCategories') {
+    state.expenseCategories = [];
+  } else if (type === 'incomeCategories') {
+    state.incomeCategories = [];
   }
   saveState();
   selectedEntryId = null;
   document.getElementById('entryEditor').classList.add('hidden');
   refreshUI();
   showMessage('Datos limpiados.', 'success');
+}
+
+function getBackupPayload() {
+  return {
+    ...state,
+    entries: state.entries.map(normalizeEntry),
+    version: APP_VERSION
+  };
+}
+
+function downloadBackup() {
+  const payload = getBackupPayload();
+  const data = JSON.stringify(payload, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `misfinanzas-backup-${new Date().toISOString().slice(0,10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  const preview = document.getElementById('backupPreview');
+  if (preview) preview.value = data;
+  showMessage('Backup descargado.', 'success');
+}
+
+function restoreFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed || !Array.isArray(parsed.entries)) throw new Error('Backup inválido');
+      state = {
+        ...state,
+        ...parsed,
+        entries: parsed.entries.map(normalizeEntry),
+        incomeCategories: parsed.incomeCategories ? [...parsed.incomeCategories] : [],
+        expenseCategories: parsed.expenseCategories ? [...parsed.expenseCategories] : [],
+        currency: parsed.currency || DEFAULT_CURRENCY,
+        theme: parsed.theme || 'light'
+      };
+      saveState();
+      applyTheme(state.theme);
+      document.getElementById('themeToggle').checked = state.theme === 'dark';
+      const preview = document.getElementById('backupPreview');
+      if (preview) preview.value = JSON.stringify(parsed, null, 2);
+      selectedEntryId = null;
+      document.getElementById('entryEditor').classList.add('hidden');
+      refreshUI();
+      showMessage('Backup restaurado con éxito.', 'success');
+    } catch (err) {
+      console.error(err);
+      showMessage('No se pudo restaurar el backup.', 'error');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
 }
 
 function toggleRankingMode() {
@@ -705,7 +834,7 @@ function formatCurrency(value, currency = DEFAULT_CURRENCY) {
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function toInputDate(date) {
