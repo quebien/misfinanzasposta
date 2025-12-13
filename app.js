@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = '1.2.0';
 const DEFAULT_CURRENCY = '$';
 
 let state = loadState();
@@ -43,14 +43,14 @@ function loadState() {
 function seedData() {
   const today = new Date();
   const entries = [];
-  const incomeCategories = ['Salario', 'Freelance', 'Ahorro'];
+  const incomeCategories = ['Salario', 'Freelance'];
   const expenseCategories = ['Alquiler', 'Comida', 'Transporte', 'Ocio', 'Servicios'];
   const sample = [
     { type: 'income', description: 'Salario', amount: 3500, date: shiftMonths(today, -2), category: 'Salario', notes: 'Pago mensual' },
     { type: 'income', description: 'Freelance UX', amount: 900, date: shiftMonths(today, -1), category: 'Freelance', notes: 'Proyecto landing' },
     { type: 'income', description: 'Salario', amount: 3600, date: shiftMonths(today, -1), category: 'Salario', notes: 'Aumento 3%' },
     { type: 'income', description: 'Salario', amount: 3600, date: today, category: 'Salario', notes: 'Mes actual' },
-    { type: 'income', description: 'Reintegro impuesto', amount: 250, date: today, category: 'Ahorro', notes: 'Devolución' },
+    { type: 'income', description: 'Reintegro impuesto', amount: 250, date: today, category: 'Freelance', notes: 'Devolución' },
     { type: 'expense', description: 'Alquiler', amount: 1200, date: shiftMonths(today, -2), category: 'Alquiler', notes: '' },
     { type: 'expense', description: 'Supermercado', amount: 320, date: shiftMonths(today, -1), category: 'Comida', notes: '' },
     { type: 'expense', description: 'Transporte', amount: 110, date: shiftMonths(today, -1), category: 'Transporte', notes: 'Abono mensual' },
@@ -85,6 +85,13 @@ function bindTabs() {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(btn.dataset.target).classList.add('active');
+      if (btn.dataset.target === 'dashboard') {
+        renderMonth();
+        renderDashboard();
+      }
+      if (btn.dataset.target === 'search') {
+        focusSearchInput();
+      }
     });
   });
 }
@@ -133,6 +140,10 @@ function bindControls() {
   document.getElementById('addExpenseCategory').addEventListener('click', () => handleCategoryAdd('expense'));
   document.getElementById('incomeCategoryList').addEventListener('click', handleCategoryAction);
   document.getElementById('expenseCategoryList').addEventListener('click', handleCategoryAction);
+  document.getElementById('clearSearchText').addEventListener('click', clearSearchText);
+  document.getElementById('resetAll').addEventListener('click', () => handleReset('all'));
+  document.getElementById('resetExpenses').addEventListener('click', () => handleReset('expense'));
+  document.getElementById('resetIncomes').addEventListener('click', () => handleReset('income'));
 }
 
 function setTodayDefaults() {
@@ -390,7 +401,7 @@ function renderDashboard() {
 
   const recentList = document.getElementById('recentList');
   recentList.innerHTML = '';
-  const sorted = [...state.entries].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+  const sorted = [...state.entries].sort((a,b) => new Date(b.date) - new Date(a.date));
   sorted.forEach(entry => {
     const li = document.createElement('li');
     const left = document.createElement('div');
@@ -399,6 +410,7 @@ function renderDashboard() {
     amount.className = 'amount ' + (entry.type === 'expense' ? 'negative' : 'positive');
     amount.textContent = (entry.type === 'expense' ? '-' : '+') + formatCurrency(entry.amount, currency);
     li.append(left, amount);
+    li.addEventListener('click', () => openEntryFromShortcut(entry.id));
     recentList.appendChild(li);
   });
 }
@@ -471,15 +483,18 @@ function renderSearchResults(list) {
   const tbody = document.getElementById('searchResults');
   tbody.innerHTML = '';
   const currency = DEFAULT_CURRENCY;
+  const fragment = document.createDocumentFragment();
   list.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(entry => {
     const tr = document.createElement('tr');
     tr.dataset.id = entry.id;
     tr.classList.add('clickable-row');
+    if (entry.id === selectedEntryId) tr.classList.add('selected-row');
     const amountClass = entry.type === 'expense' ? 'amount negative' : 'amount positive';
     tr.innerHTML = `<td>${formatDate(entry.date)}</td><td>${entry.type === 'expense' ? 'Gasto' : 'Ingreso'}</td><td>${entry.description}</td><td>${entry.category}</td><td class="${amountClass}">${(entry.type === 'expense' ? '-' : '+') + formatCurrency(entry.amount, currency)}</td><td>${entry.notes || ''}</td>`;
     tr.addEventListener('click', () => openEditor(entry.id));
-    tbody.appendChild(tr);
+    fragment.appendChild(tr);
   });
+  tbody.appendChild(fragment);
 }
 
 function openEditor(entryId) {
@@ -495,6 +510,9 @@ function openEditor(entryId) {
   updateEditCategoryOptions(entry.type, entry.category);
   document.getElementById('editorId').textContent = entryId;
   document.getElementById('entryEditor').classList.remove('hidden');
+  document.getElementById('entryEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  form.description.focus();
+  highlightSearchRow(entryId);
 }
 
 function updateEditCategoryOptions(type, selectedValue) {
@@ -542,6 +560,66 @@ function handleDeleteEntry() {
   document.getElementById('entryEditor').classList.add('hidden');
   refreshUI();
   showMessage('Registro eliminado.', 'success');
+}
+
+function openEntryFromShortcut(entryId) {
+  switchTab('search');
+  renderSearchResults(state.entries);
+  openEditor(entryId);
+}
+
+function switchTab(targetId) {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.target === targetId);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === targetId);
+  });
+  if (targetId === 'search') focusSearchInput();
+  if (targetId === 'dashboard') {
+    renderMonth();
+    renderDashboard();
+  }
+}
+
+function focusSearchInput() {
+  const input = document.querySelector('#searchForm input[name="text"]');
+  if (input) input.focus();
+}
+
+function highlightSearchRow(entryId) {
+  document.querySelectorAll('#searchResults tr').forEach(tr => {
+    tr.classList.toggle('selected-row', tr.dataset.id === String(entryId));
+  });
+  const row = document.querySelector(`#searchResults tr[data-id="${entryId}"]`);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearSearchText() {
+  const input = document.querySelector('#searchForm input[name="text"]');
+  if (!input) return;
+  input.value = '';
+  input.focus();
+  renderSearchResults(state.entries);
+}
+
+function handleReset(type) {
+  const prompts = {
+    all: '¿Seguro que querés borrar TODOS los movimientos? Esta acción no se puede deshacer.',
+    expense: '¿Seguro que querés borrar solo los gastos? Esta acción no se puede deshacer.',
+    income: '¿Seguro que querés borrar solo los ingresos? Esta acción no se puede deshacer.'
+  };
+  if (!confirm(prompts[type])) return;
+  if (type === 'all') {
+    state.entries = [];
+  } else {
+    state.entries = state.entries.filter(e => e.type !== type);
+  }
+  saveState();
+  selectedEntryId = null;
+  document.getElementById('entryEditor').classList.add('hidden');
+  refreshUI();
+  showMessage('Datos limpiados.', 'success');
 }
 
 function toggleRankingMode() {

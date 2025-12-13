@@ -81,7 +81,7 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .panel { display: none; }
 .panel.active { display: block; }
 
-.toast { position: sticky; top: 12px; margin: 0 12px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--panel); font-weight: 700; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); max-width: 520px; width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--panel); font-weight: 700; z-index: 20; }
 .toast.success { border-color: var(--accent); }
 .toast.error { border-color: var(--danger); color: var(--danger); }
 .toast.hidden { display: none; }
@@ -120,8 +120,8 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .card.expense h3 { color: var(--danger); }
 .card.balance h3.negative { color: var(--danger); }
 
-.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; max-height: 380px; overflow: auto; }
+.list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); cursor: pointer; }
 .list small { color: var(--muted); }
 .amount { font-weight: 700; }
 .amount.negative { color: var(--danger); }
@@ -145,19 +145,13 @@ input, textarea, select, button {
 input, textarea { padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
 textarea { resize: vertical; }
 
-button[type="submit"], #addCategory {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  border: none;
-  padding: 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 700;
-  box-shadow: var(--shadow);
-}
+button[type="submit"], #addCategory { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 700; box-shadow: var(--shadow); }
+button.btn-expense { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+button.btn-income { background: linear-gradient(135deg, #16a34a, #15803d); }
 button:hover { opacity: 0.93; }
 
 .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
+.table-wrapper.search-table { max-height: 60vh; overflow-y: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
 th { background: rgba(16,163,127,0.08); }
@@ -178,6 +172,7 @@ tr:last-child td { border-bottom: none; }
 .editor-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .clickable-row { cursor: pointer; }
 .clickable-row:hover { background: rgba(84,104,255,0.08); }
+.selected-row { background: rgba(16,163,127,0.12); }
 
 footer { text-align: center; color: var(--muted); padding: 16px; }
 
@@ -192,6 +187,18 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 .optional { color: var(--muted); }
 .muted { color: var(--muted); }
 .hidden { display: none; }
+
+.section-title { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.expense-card { border-color: rgba(239,68,68,0.3); background: linear-gradient(135deg, rgba(239,68,68,0.05), var(--panel)); }
+.income-card { border-color: rgba(22,163,74,0.3); background: linear-gradient(135deg, rgba(22,163,74,0.05), var(--panel)); }
+.expense-title { color: #b91c1c; }
+.income-title { color: #15803d; }
+
+.search-input { position: relative; display: flex; align-items: center; }
+.search-input input { width: 100%; padding-right: 36px; }
+.search-input button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; color: var(--muted); border: none; box-shadow: none; padding: 4px 6px; cursor: pointer; }
+
+.button-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 @media (max-width: 680px) {
   .panel-header { flex-direction: column; align-items: flex-start; }
