@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Finanzas Posta</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">💰</span>
+      <div>
+        <h1>Mis Finanzas Posta</h1>
+        <p>Tu panel financiero en cualquier dispositivo</p>
+      </div>
+    </div>
+    <div class="actions">
+      <label class="toggle">
+        <input type="checkbox" id="themeToggle">
+        <span class="slider"></span>
+        <span class="toggle-label">Tema oscuro</span>
+      </label>
+      <select id="currencySelect" title="Moneda">
+        <option value="$">$ (ARS/USD genérico)</option>
+        <option value="€">€ Euro</option>
+        <option value="£">£ Libra</option>
+        <option value="¥">¥ Yen</option>
+      </select>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-target="dashboard">Resumen</button>
+    <button class="tab" data-target="add">Nuevo</button>
+    <button class="tab" data-target="monthly">Mes a Mes</button>
+    <button class="tab" data-target="search">Buscador</button>
+    <button class="tab" data-target="charts">Gráficos</button>
+    <button class="tab" data-target="settings">Configuración</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="panel active">
+      <div class="panel-header">
+        <div class="month-switch">
+          <button id="prevMonth" aria-label="Mes anterior">◀</button>
+          <h2 id="currentMonth"></h2>
+          <button id="nextMonth" aria-label="Mes siguiente">▶</button>
+        </div>
+        <div class="quick-stats">
+          <div class="card income">
+            <p>Ingresos</p>
+            <h3 id="monthIncome">$0</h3>
+          </div>
+          <div class="card expense">
+            <p>Gastos</p>
+            <h3 id="monthExpense">$0</h3>
+          </div>
+          <div class="card balance">
+            <p>Balance</p>
+            <h3 id="monthBalance">$0</h3>
+          </div>
+        </div>
+      </div>
+      <div class="panel-content">
+        <h3>Últimos movimientos</h3>
+        <ul id="recentList" class="list"></ul>
+      </div>
+    </section>
+
+    <section id="add" class="panel">
+      <div class="two-columns">
+        <div>
+          <h2>Nuevo gasto</h2>
+          <form id="expenseForm" class="form-card">
+            <label>Descripción<input name="description" required></label>
+            <label>Monto<input name="amount" type="number" step="0.01" required></label>
+            <label>Fecha<input name="date" type="date" required></label>
+            <label>Categoría<select name="category" required></select></label>
+            <label>Repetición<select name="repeat">
+              <option value="none">No repite</option>
+              <option value="monthly">Repite mes a mes</option>
+              <option value="installments">Dividir en cuotas</option>
+            </select></label>
+            <label id="repeatCountLabel" class="optional">Cantidad de repeticiones/cuotas<input name="repeatCount" type="number" min="1" value="1"></label>
+            <label>Notas<textarea name="notes" rows="2"></textarea></label>
+            <button type="submit">Agregar gasto</button>
+          </form>
+        </div>
+        <div>
+          <h2>Nuevo ingreso</h2>
+          <form id="incomeForm" class="form-card">
+            <label>Descripción<input name="description" required></label>
+            <label>Monto<input name="amount" type="number" step="0.01" required></label>
+            <label>Fecha<input name="date" type="date" required></label>
+            <label>Categoría<select name="category" required></select></label>
+            <label>Repetición<select name="repeat">
+              <option value="none">No repite</option>
+              <option value="monthly">Repite mes a mes</option>
+              <option value="installments">Dividir en cuotas</option>
+            </select></label>
+            <label id="repeatCountLabelIncome" class="optional">Cantidad de repeticiones/cuotas<input name="repeatCount" type="number" min="1" value="1"></label>
+            <label>Notas<textarea name="notes" rows="2"></textarea></label>
+            <button type="submit">Agregar ingreso</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="monthly" class="panel">
+      <div class="panel-header">
+        <h2>Mes a mes</h2>
+        <p>Totales históricos y gráfico de tendencia</p>
+      </div>
+      <div class="panel-content">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr>
+            </thead>
+            <tbody id="monthlyTable"></tbody>
+          </table>
+        </div>
+        <canvas id="monthlyChart" height="140"></canvas>
+      </div>
+    </section>
+
+    <section id="search" class="panel">
+      <div class="panel-header">
+        <h2>Buscador</h2>
+        <p>Filtra por descripción, fecha y categoría</p>
+      </div>
+      <form id="searchForm" class="form-row">
+        <input name="text" placeholder="Descripción" aria-label="Descripción">
+        <input name="from" type="date" aria-label="Desde">
+        <input name="to" type="date" aria-label="Hasta">
+        <select name="category" aria-label="Categoría">
+          <option value="">Todas</option>
+        </select>
+        <button type="submit">Buscar</button>
+      </form>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th>Notas</th></tr></thead>
+          <tbody id="searchResults"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="charts" class="panel">
+      <div class="panel-header">
+        <h2>Gráficos y ranking</h2>
+        <p>Selecciona un mes o rango para ver el ranking de categorías</p>
+      </div>
+      <div class="form-row">
+        <label>Modo
+          <select id="rankingMode">
+            <option value="month">Mes</option>
+            <option value="range">Rango de fechas</option>
+          </select>
+        </label>
+        <label id="monthPickerLabel">Mes
+          <input type="month" id="rankingMonth">
+        </label>
+        <label id="rangeFromLabel" class="hidden">Desde
+          <input type="date" id="rankingFrom">
+        </label>
+        <label id="rangeToLabel" class="hidden">Hasta
+          <input type="date" id="rankingTo">
+        </label>
+      </div>
+      <div class="two-columns">
+        <div class="chart-card">
+          <h3>Ranking gastos</h3>
+          <canvas id="expenseRank"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Ranking ingresos</h3>
+          <canvas id="incomeRank"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings" class="panel">
+      <div class="panel-header">
+        <h2>Configuración</h2>
+        <p>Personaliza categorías, moneda y tema</p>
+      </div>
+      <div class="form-card">
+        <label>Nueva categoría
+          <input id="newCategory" placeholder="Ej: Transporte" aria-label="Nueva categoría">
+        </label>
+        <button id="addCategory">Agregar categoría</button>
+        <p class="muted">Categorías actuales: <span id="categoryList"></span></p>
+      </div>
+      <div class="form-card">
+        <p>Moneda seleccionada: <strong id="currencyPreview"></strong></p>
+        <p>Tema actual: <strong id="themePreview"></strong></p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Mis Finanzas Posta · Control total en tu navegador</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
