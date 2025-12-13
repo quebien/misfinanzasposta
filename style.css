@@ -47,6 +47,8 @@ body {
 .brand h1 { margin: 0; font-size: 20px; }
 .brand p { margin: 0; color: var(--muted); font-size: 13px; }
 .logo { font-size: 28px; }
+.pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(16,163,127,0.12); color: var(--text); font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+.pill.muted { background: rgba(0,0,0,0.03); }
 
 .actions { display: flex; gap: 12px; align-items: center; }
 select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
@@ -78,6 +80,11 @@ select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border)
 main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .panel { display: none; }
 .panel.active { display: block; }
+
+.toast { position: sticky; top: 12px; margin: 0 12px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--panel); font-weight: 700; }
+.toast.success { border-color: var(--accent); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+.toast.hidden { display: none; }
 
 .panel-header {
   display: flex;
@@ -158,8 +165,19 @@ tr:last-child td { border-bottom: none; }
 
 .form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
 .form-row input, .form-row select { min-width: 140px; }
+.form-row .grow { flex: 1; }
 
 .chart-card { background: var(--panel); border: 1px solid var(--border); padding: 12px; border-radius: 14px; box-shadow: var(--shadow); }
+
+.chip-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: rgba(16,163,127,0.08); border: 1px solid var(--border); }
+
+.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); box-shadow: none; padding: 6px 10px; }
+.ghost.danger { color: var(--danger); border-color: var(--danger); }
+.editor-actions { display: flex; gap: 8px; align-items: center; }
+.editor-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover { background: rgba(84,104,255,0.08); }
 
 footer { text-align: center; color: var(--muted); padding: 16px; }
 

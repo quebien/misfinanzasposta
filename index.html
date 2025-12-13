@@ -16,8 +16,9 @@
       <span class="logo">💰</span>
       <div>
         <h1>Mis Finanzas Posta</h1>
-        <p>Tu panel financiero en cualquier dispositivo</p>
+        <p>Control financiero que funciona posta</p>
       </div>
+      <span class="pill" id="versionBadge"></span>
     </div>
     <div class="actions">
       <label class="toggle">
@@ -25,14 +26,10 @@
         <span class="slider"></span>
         <span class="toggle-label">Tema oscuro</span>
       </label>
-      <select id="currencySelect" title="Moneda">
-        <option value="$">$ (ARS/USD genérico)</option>
-        <option value="€">€ Euro</option>
-        <option value="£">£ Libra</option>
-        <option value="¥">¥ Yen</option>
-      </select>
     </div>
   </header>
+
+  <div id="message" class="toast hidden" role="status" aria-live="polite"></div>
 
   <nav class="tabs">
     <button class="tab active" data-target="dashboard">Resumen</button>
@@ -149,6 +146,30 @@
           <tbody id="searchResults"></tbody>
         </table>
       </div>
+
+      <div id="entryEditor" class="form-card hidden">
+        <div class="editor-header">
+          <h3>Detalle de registro</h3>
+          <div class="pill muted" id="editorId"></div>
+        </div>
+        <form id="editForm" class="form-row">
+          <label>Tipo
+            <select name="type" required>
+              <option value="income">Ingreso</option>
+              <option value="expense">Gasto</option>
+            </select>
+          </label>
+          <label>Descripción<input name="description" required></label>
+          <label>Monto<input name="amount" type="number" step="0.01" required></label>
+          <label>Fecha<input name="date" type="date" required></label>
+          <label>Categoría<select name="category" required></select></label>
+          <label>Notas<textarea name="notes" rows="2"></textarea></label>
+          <div class="editor-actions">
+            <button type="submit">Guardar cambios</button>
+            <button type="button" id="deleteEntry" class="ghost danger">Borrar</button>
+          </div>
+        </form>
+      </div>
     </section>
 
     <section id="charts" class="panel">
@@ -188,24 +209,36 @@
     <section id="settings" class="panel">
       <div class="panel-header">
         <h2>Configuración</h2>
-        <p>Personaliza categorías, moneda y tema</p>
+        <p>Personaliza categorías y tema</p>
       </div>
       <div class="form-card">
-        <label>Nueva categoría
-          <input id="newCategory" placeholder="Ej: Transporte" aria-label="Nueva categoría">
-        </label>
-        <button id="addCategory">Agregar categoría</button>
-        <p class="muted">Categorías actuales: <span id="categoryList"></span></p>
+        <h3>Categorías de ingresos</h3>
+        <div class="form-row">
+          <label class="grow">Nueva categoría
+            <input id="newIncomeCategory" placeholder="Ej: Salario extra" aria-label="Nueva categoría de ingreso">
+          </label>
+          <button type="button" id="addIncomeCategory">Agregar</button>
+        </div>
+        <div class="chip-list" id="incomeCategoryList"></div>
       </div>
       <div class="form-card">
-        <p>Moneda seleccionada: <strong id="currencyPreview"></strong></p>
+        <h3>Categorías de gastos</h3>
+        <div class="form-row">
+          <label class="grow">Nueva categoría
+            <input id="newExpenseCategory" placeholder="Ej: Transporte" aria-label="Nueva categoría de gasto">
+          </label>
+          <button type="button" id="addExpenseCategory">Agregar</button>
+        </div>
+        <div class="chip-list" id="expenseCategoryList"></div>
+      </div>
+      <div class="form-card">
         <p>Tema actual: <strong id="themePreview"></strong></p>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>Mis Finanzas Posta · Control total en tu navegador</p>
+    <p id="footerText"></p>
   </footer>
 
   <script src="app.js"></script>
