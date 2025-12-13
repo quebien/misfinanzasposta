@@ -1,7 +1,11 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
+const APP_VERSION = 'v1.1.0';
+const DEFAULT_CURRENCY = '$';
+
 let state = loadState();
 let currentMonth = new Date();
 let monthlyChart, expenseRankChart, incomeRankChart;
+let selectedEntryId = null;
 
 init();
 
@@ -10,8 +14,9 @@ function init() {
   bindForms();
   bindControls();
   applyTheme(state.theme || 'light');
-  document.getElementById('currencySelect').value = state.currency || '$';
   document.getElementById('themeToggle').checked = state.theme === 'dark';
+  document.getElementById('versionBadge').textContent = `v${APP_VERSION}`;
+  document.getElementById('footerText').textContent = `Mis Finanzas Posta versión ${APP_VERSION} · Desarrollado por Andrés B.M. Carizza e IA`;
   renderCategories();
   renderMonth();
   renderDashboard();
@@ -23,14 +28,23 @@ function init() {
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) return JSON.parse(saved);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    return {
+      ...parsed,
+      incomeCategories: parsed.incomeCategories ? [...parsed.incomeCategories] : (parsed.categories ? [...parsed.categories] : []),
+      expenseCategories: parsed.expenseCategories ? [...parsed.expenseCategories] : (parsed.categories ? [...parsed.categories] : []),
+      currency: DEFAULT_CURRENCY
+    };
+  }
   return seedData();
 }
 
 function seedData() {
   const today = new Date();
   const entries = [];
-  const categories = ['Salario', 'Freelance', 'Alquiler', 'Comida', 'Transporte', 'Ocio', 'Servicios', 'Ahorro'];
+  const incomeCategories = ['Salario', 'Freelance', 'Ahorro'];
+  const expenseCategories = ['Alquiler', 'Comida', 'Transporte', 'Ocio', 'Servicios'];
   const sample = [
     { type: 'income', description: 'Salario', amount: 3500, date: shiftMonths(today, -2), category: 'Salario', notes: 'Pago mensual' },
     { type: 'income', description: 'Freelance UX', amount: 900, date: shiftMonths(today, -1), category: 'Freelance', notes: 'Proyecto landing' },
@@ -48,7 +62,7 @@ function seedData() {
 
   sample.forEach((item, idx) => entries.push({ ...item, id: idx + 1, date: toInputDate(item.date) }));
 
-  const initial = { entries, categories, currency: '$', theme: 'light' };
+  const initial = { entries, incomeCategories, expenseCategories, currency: DEFAULT_CURRENCY, theme: 'light' };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
@@ -90,6 +104,9 @@ function bindForms() {
   document.getElementById('rankingMonth').addEventListener('change', renderRanking);
   document.getElementById('rankingFrom').addEventListener('change', renderRanking);
   document.getElementById('rankingTo').addEventListener('change', renderRanking);
+  document.getElementById('editForm').addEventListener('submit', handleEditSubmit);
+  document.getElementById('deleteEntry').addEventListener('click', handleDeleteEntry);
+  document.querySelector('#editForm select[name="type"]').addEventListener('change', e => updateEditCategoryOptions(e.target.value));
   ['expenseForm','incomeForm'].forEach(id => {
     const form = document.getElementById(id);
     const repeatSelect = form.querySelector('select[name="repeat"]');
@@ -112,24 +129,10 @@ function bindControls() {
     refreshUI();
   });
 
-  document.getElementById('currencySelect').addEventListener('change', e => {
-    state.currency = e.target.value;
-    saveState();
-    refreshUI();
-  });
-
-  document.getElementById('addCategory').addEventListener('click', () => {
-    const input = document.getElementById('newCategory');
-    const value = input.value.trim();
-    if (!value) return;
-    if (!state.categories.includes(value)) {
-      state.categories.push(value);
-      saveState();
-      renderCategories();
-      updatePreviews();
-    }
-    input.value = '';
-  });
+  document.getElementById('addIncomeCategory').addEventListener('click', () => handleCategoryAdd('income'));
+  document.getElementById('addExpenseCategory').addEventListener('click', () => handleCategoryAdd('expense'));
+  document.getElementById('incomeCategoryList').addEventListener('click', handleCategoryAction);
+  document.getElementById('expenseCategoryList').addEventListener('click', handleCategoryAction);
 }
 
 function setTodayDefaults() {
@@ -148,7 +151,16 @@ function addEntriesFromForm(form, type) {
   const repeatCount = Math.max(1, Number(data.get('repeatCount') || 1));
   const notes = data.get('notes').trim();
 
-  if (!description || !amount || !date || !category) return;
+  if (!description || !amount || !date || !category) {
+    showMessage('Completá todos los campos para guardar el movimiento.', 'error');
+    return;
+  }
+
+  const validCategories = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  if (!validCategories.includes(category)) {
+    showMessage('Seleccioná una categoría válida.', 'error');
+    return;
+  }
 
   const entriesToAdd = [];
   const baseDate = new Date(date + 'T00:00:00');
@@ -172,7 +184,10 @@ function addEntriesFromForm(form, type) {
   saveState();
   form.reset();
   setTodayDefaults();
+  const categorySelect = form.querySelector('select[name="category"]');
+  if (categorySelect) categorySelect.value = '';
   refreshUI();
+  showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
 }
 
 function createEntry({ type, description, amount, date, category, notes }) {
@@ -191,11 +206,21 @@ function annotate(notes, extra) {
   return notes ? `${notes} · ${extra}` : extra;
 }
 
+function showMessage(text, type = 'success') {
+  const box = document.getElementById('message');
+  box.textContent = text;
+  box.className = `toast ${type}`;
+  box.classList.remove('hidden');
+  clearTimeout(showMessage.timer);
+  showMessage.timer = setTimeout(() => box.classList.add('hidden'), 3500);
+}
+
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function refreshUI() {
+  renderCategories();
   renderDashboard();
   renderMonthlyViews();
   renderSearchResults(state.entries);
@@ -204,30 +229,145 @@ function refreshUI() {
 }
 
 function renderCategories() {
-  const selects = [
-    document.querySelector('#expenseForm select[name="category"]'),
-    document.querySelector('#incomeForm select[name="category"]'),
-    document.querySelector('#searchForm select[name="category"]')
-  ];
-  selects.forEach(select => {
-    if (!select) return;
-    const current = select.value;
-    select.innerHTML = '';
-    if (select.name === 'category' && select.closest('#search')) {
+  const expenseSelect = document.querySelector('#expenseForm select[name="category"]');
+  const incomeSelect = document.querySelector('#incomeForm select[name="category"]');
+  const searchSelect = document.querySelector('#searchForm select[name="category"]');
+
+  populateCategorySelect(incomeSelect, state.incomeCategories, true);
+  populateCategorySelect(expenseSelect, state.expenseCategories, true);
+
+  if (searchSelect) {
+    const current = searchSelect.value;
+    searchSelect.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'Todas';
+    searchSelect.appendChild(allOpt);
+    state.incomeCategories.forEach(cat => {
       const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Todas';
-      select.appendChild(opt);
-    }
-    state.categories.forEach(cat => {
-      const option = document.createElement('option');
-      option.value = cat;
-      option.textContent = cat;
-      if (cat === current) option.selected = true;
-      select.appendChild(option);
+      opt.value = cat;
+      opt.textContent = cat;
+      if (cat === current) opt.selected = true;
+      searchSelect.appendChild(opt);
     });
+    const divider = document.createElement('option');
+    divider.textContent = ',-------,';
+    divider.disabled = true;
+    searchSelect.appendChild(divider);
+    state.expenseCategories.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      if (cat === current) opt.selected = true;
+      searchSelect.appendChild(opt);
+    });
+  }
+
+  renderCategoryChips('income');
+  renderCategoryChips('expense');
+}
+
+function populateCategorySelect(select, categories, includePlaceholder = false, selectedValue) {
+  if (!select) return;
+  const current = selectedValue !== undefined ? selectedValue : select.value;
+  select.innerHTML = '';
+  if (includePlaceholder) {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Seleccioná una categoría';
+    placeholder.disabled = true;
+    placeholder.selected = !current;
+    select.appendChild(placeholder);
+  }
+  categories.forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    if (cat === current) option.selected = true;
+    select.appendChild(option);
   });
-  document.getElementById('categoryList').textContent = state.categories.join(', ');
+}
+
+function renderCategoryChips(type) {
+  const container = document.getElementById(type === 'income' ? 'incomeCategoryList' : 'expenseCategoryList');
+  const categories = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  if (!container) return;
+  container.innerHTML = '';
+  categories.forEach(cat => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `<span>${cat}</span>`;
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Editar';
+    editBtn.dataset.category = cat;
+    editBtn.dataset.type = type;
+    editBtn.dataset.action = 'edit';
+    editBtn.className = 'ghost';
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Borrar';
+    delBtn.dataset.category = cat;
+    delBtn.dataset.type = type;
+    delBtn.dataset.action = 'delete';
+    delBtn.className = 'ghost danger';
+    chip.append(editBtn, delBtn);
+    container.appendChild(chip);
+  });
+}
+
+function handleCategoryAdd(type) {
+  const input = document.getElementById(type === 'income' ? 'newIncomeCategory' : 'newExpenseCategory');
+  const value = (input.value || '').trim();
+  if (!value) {
+    showMessage('Ingresá un nombre de categoría.', 'error');
+    return;
+  }
+  const list = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  if (list.includes(value)) {
+    showMessage('La categoría ya existe.', 'error');
+    return;
+  }
+  list.push(value);
+  saveState();
+  input.value = '';
+  refreshUI();
+  showMessage('Categoría agregada con éxito.', 'success');
+}
+
+function handleCategoryAction(event) {
+  const btn = event.target.closest('button');
+  if (!btn) return;
+  const { category, type, action } = btn.dataset;
+  if (!category || !type) return;
+  const list = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  if (action === 'edit') {
+    const updated = prompt('Nuevo nombre de la categoría', category);
+    if (!updated) return;
+    const trimmed = updated.trim();
+    if (!trimmed) return;
+    if (list.includes(trimmed) && trimmed !== category) {
+      showMessage('Ya existe otra categoría con ese nombre.', 'error');
+      return;
+    }
+    const idx = list.indexOf(category);
+    if (idx >= 0) list[idx] = trimmed;
+    state.entries.filter(e => e.type === (type === 'income' ? 'income' : 'expense') && e.category === category)
+      .forEach(e => e.category = trimmed);
+    saveState();
+    refreshUI();
+    showMessage('Categoría actualizada sin dejar datos huérfanos.', 'success');
+  }
+  if (action === 'delete') {
+    const used = state.entries.filter(e => e.type === (type === 'income' ? 'income' : 'expense') && e.category === category);
+    if (used.length) {
+      showMessage(`No se puede borrar, hay ${used.length} movimientos con esta categoría.`, 'error');
+      return;
+    }
+    const idx = list.indexOf(category);
+    if (idx >= 0) list.splice(idx,1);
+    saveState();
+    refreshUI();
+    showMessage('Categoría eliminada.', 'success');
+  }
 }
 
 function renderMonth() {
@@ -241,7 +381,7 @@ function renderDashboard() {
   const expense = sumByType(monthEntries, 'expense');
   const balance = income - expense;
 
-  const currency = state.currency || '$';
+  const currency = DEFAULT_CURRENCY;
   document.getElementById('monthIncome').textContent = formatCurrency(income, currency);
   document.getElementById('monthExpense').textContent = formatCurrency(expense, currency);
   const balanceEl = document.getElementById('monthBalance');
@@ -271,7 +411,7 @@ function renderMonthlyViews() {
   const labels = [];
   const incomeData = [];
   const expenseData = [];
-  const currency = state.currency || '$';
+  const currency = DEFAULT_CURRENCY;
 
   rows.forEach(([month, entries]) => {
     const income = sumByType(entries, 'income');
@@ -330,13 +470,78 @@ function handleSearch(e) {
 function renderSearchResults(list) {
   const tbody = document.getElementById('searchResults');
   tbody.innerHTML = '';
-  const currency = state.currency || '$';
+  const currency = DEFAULT_CURRENCY;
   list.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(entry => {
     const tr = document.createElement('tr');
+    tr.dataset.id = entry.id;
+    tr.classList.add('clickable-row');
     const amountClass = entry.type === 'expense' ? 'amount negative' : 'amount positive';
     tr.innerHTML = `<td>${formatDate(entry.date)}</td><td>${entry.type === 'expense' ? 'Gasto' : 'Ingreso'}</td><td>${entry.description}</td><td>${entry.category}</td><td class="${amountClass}">${(entry.type === 'expense' ? '-' : '+') + formatCurrency(entry.amount, currency)}</td><td>${entry.notes || ''}</td>`;
+    tr.addEventListener('click', () => openEditor(entry.id));
     tbody.appendChild(tr);
   });
+}
+
+function openEditor(entryId) {
+  const entry = state.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  selectedEntryId = entryId;
+  const form = document.getElementById('editForm');
+  form.description.value = entry.description;
+  form.amount.value = entry.amount;
+  form.date.value = entry.date;
+  form.notes.value = entry.notes || '';
+  form.type.value = entry.type;
+  updateEditCategoryOptions(entry.type, entry.category);
+  document.getElementById('editorId').textContent = entryId;
+  document.getElementById('entryEditor').classList.remove('hidden');
+}
+
+function updateEditCategoryOptions(type, selectedValue) {
+  const select = document.querySelector('#editForm select[name="category"]');
+  const list = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  populateCategorySelect(select, list, true, selectedValue);
+  if (!selectedValue) select.value = '';
+}
+
+function handleEditSubmit(e) {
+  e.preventDefault();
+  if (!selectedEntryId) return;
+  const form = e.target;
+  const data = new FormData(form);
+  const description = data.get('description').trim();
+  const amount = Number(data.get('amount'));
+  const date = data.get('date');
+  const category = data.get('category');
+  const type = data.get('type');
+  const notes = data.get('notes').trim();
+  if (!description || !amount || !date || !category || !type) {
+    showMessage('Completá todos los campos del registro.', 'error');
+    return;
+  }
+  const list = type === 'income' ? state.incomeCategories : state.expenseCategories;
+  if (!list.includes(category)) {
+    showMessage('Seleccioná una categoría válida para el tipo elegido.', 'error');
+    return;
+  }
+  const entry = state.entries.find(e => e.id === selectedEntryId);
+  if (!entry) return;
+  Object.assign(entry, { description, amount: Number(amount), date, category, type, notes });
+  saveState();
+  refreshUI();
+  openEditor(selectedEntryId);
+  showMessage('Registro actualizado.', 'success');
+}
+
+function handleDeleteEntry() {
+  if (!selectedEntryId) return;
+  if (!confirm('¿Seguro que querés borrar este registro?')) return;
+  state.entries = state.entries.filter(e => e.id !== selectedEntryId);
+  saveState();
+  selectedEntryId = null;
+  document.getElementById('entryEditor').classList.add('hidden');
+  refreshUI();
+  showMessage('Registro eliminado.', 'success');
 }
 
 function toggleRankingMode() {
@@ -416,7 +621,7 @@ function sumByType(list, type) {
   return list.filter(e => e.type === type).reduce((acc, e) => acc + Number(e.amount), 0);
 }
 
-function formatCurrency(value, currency) {
+function formatCurrency(value, currency = DEFAULT_CURRENCY) {
   return `${currency}${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -442,6 +647,5 @@ function applyTheme(theme) {
 }
 
 function updatePreviews() {
-  document.getElementById('currencyPreview').textContent = state.currency || '$';
   document.getElementById('themePreview').textContent = state.theme === 'dark' ? 'Oscuro' : 'Claro';
 }
