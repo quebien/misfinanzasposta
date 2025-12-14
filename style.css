@@ -98,6 +98,14 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
   box-shadow: var(--shadow);
 }
 
+.animations-enabled .panel-header,
+.animations-enabled .card,
+.animations-enabled .form-card,
+.animations-enabled .chart-card,
+.animations-enabled .list li { animation: fadeInUp 0.4s ease; }
+.animations-enabled .tab.active { transition: transform 0.25s ease, background 0.2s; transform: translateY(-2px); }
+.animations-enabled .list li:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
 .panel-header h2 { margin: 0 0 4px; }
 .panel-header p { margin: 0; color: var(--muted); }
 
@@ -126,6 +134,9 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .amount { font-weight: 700; }
 .amount.negative { color: var(--danger); }
 .amount.positive { color: var(--accent); }
+.list-divider { text-align: center; font-weight: 700; color: var(--muted); border-style: dashed; }
+.list li.future { border-color: #7c9dff; background: linear-gradient(135deg, rgba(124,157,255,0.14), var(--panel)); }
+.list li.today { border-color: var(--accent); }
 
 .two-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .form-card {
@@ -156,6 +167,9 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
 th { background: rgba(16,163,127,0.08); }
 tr:last-child td { border-bottom: none; }
+tr.future-row { background: linear-gradient(90deg, rgba(124,157,255,0.12), transparent); }
+.monthly-table .amount.negative, .amount.negative { color: var(--danger); }
+.monthly-table .amount.positive, .amount.positive { color: var(--accent); }
 
 .form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
 .form-row input, .form-row select { min-width: 140px; }
@@ -201,6 +215,11 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .file-label { cursor: pointer; }
 .file-label input { display: none; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 @media (max-width: 680px) {
   .panel-header { flex-direction: column; align-items: flex-start; }

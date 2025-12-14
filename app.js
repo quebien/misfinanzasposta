@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const DEFAULT_CURRENCY = '$';
+const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
+CASH_SOUND.preload = 'auto';
+CASH_SOUND.volume = 0.4;
 
 function normalizeEntry(entry) {
   return {
@@ -21,7 +24,10 @@ function init() {
   bindForms();
   bindControls();
   applyTheme(state.theme || 'light');
+  applyAnimationPreference();
   document.getElementById('themeToggle').checked = state.theme === 'dark';
+  document.getElementById('soundToggle').checked = state.soundEnabled;
+  document.getElementById('animationsToggle').checked = state.animationsEnabled;
   document.getElementById('versionBadge').textContent = `v${APP_VERSION}`;
   document.getElementById('footerText').textContent = `Mis Finanzas Posta versión ${APP_VERSION} · Desarrollado por Andrés B.M. Carizza e IA`;
   renderCategories();
@@ -40,9 +46,11 @@ function loadState() {
     return {
       ...parsed,
       entries: Array.isArray(parsed.entries) ? parsed.entries.map(normalizeEntry) : [],
-      incomeCategories: parsed.incomeCategories ? [...parsed.incomeCategories] : (parsed.categories ? [...parsed.categories] : []),
-      expenseCategories: parsed.expenseCategories ? [...parsed.expenseCategories] : (parsed.categories ? [...parsed.categories] : []),
-      currency: DEFAULT_CURRENCY
+      incomeCategories: sortCategories(parsed.incomeCategories ? [...parsed.incomeCategories] : (parsed.categories ? [...parsed.categories] : [])),
+      expenseCategories: sortCategories(parsed.expenseCategories ? [...parsed.expenseCategories] : (parsed.categories ? [...parsed.categories] : [])),
+      currency: DEFAULT_CURRENCY,
+      soundEnabled: parsed.soundEnabled !== undefined ? parsed.soundEnabled : true,
+      animationsEnabled: parsed.animationsEnabled !== undefined ? parsed.animationsEnabled : true
     };
   }
   return seedData();
@@ -70,7 +78,7 @@ function seedData() {
 
   sample.forEach((item, idx) => entries.push({ ...item, id: idx + 1, date: toInputDate(item.date) }));
 
-  const initial = { entries: entries.map(normalizeEntry), incomeCategories, expenseCategories, currency: DEFAULT_CURRENCY, theme: 'light' };
+  const initial = { entries: entries.map(normalizeEntry), incomeCategories: sortCategories(incomeCategories), expenseCategories: sortCategories(expenseCategories), currency: DEFAULT_CURRENCY, theme: 'light', soundEnabled: true, animationsEnabled: true };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
@@ -99,6 +107,8 @@ function bindTabs() {
       }
       if (btn.dataset.target === 'search') {
         focusSearchInput();
+        selectedEntryId = null;
+        document.getElementById('entryEditor').classList.add('hidden');
       }
     });
   });
@@ -145,6 +155,19 @@ function bindControls() {
     refreshUI();
   });
 
+  document.getElementById('soundToggle').addEventListener('change', e => {
+    state.soundEnabled = e.target.checked;
+    saveState();
+    showMessage(`Sonidos ${state.soundEnabled ? 'activados' : 'desactivados'}.`, 'success');
+  });
+
+  document.getElementById('animationsToggle').addEventListener('change', e => {
+    state.animationsEnabled = e.target.checked;
+    applyAnimationPreference();
+    saveState();
+    showMessage(`Animaciones ${state.animationsEnabled ? 'activadas' : 'desactivadas'}.`, 'success');
+  });
+
   document.getElementById('addIncomeCategory').addEventListener('click', () => handleCategoryAdd('income'));
   document.getElementById('addExpenseCategory').addEventListener('click', () => handleCategoryAdd('expense'));
   document.getElementById('incomeCategoryList').addEventListener('click', handleCategoryAction);
@@ -157,12 +180,18 @@ function bindControls() {
   document.getElementById('resetIncomeCategories').addEventListener('click', () => handleReset('incomeCategories'));
   document.getElementById('downloadBackup').addEventListener('click', downloadBackup);
   document.getElementById('restoreFile').addEventListener('change', restoreFromFile);
+  document.getElementById('monthlyFrom').addEventListener('change', renderMonthlyViews);
+  document.getElementById('monthlyTo').addEventListener('change', renderMonthlyViews);
 }
 
 function setTodayDefaults() {
   const today = toInputDate(new Date());
-  document.querySelectorAll('input[type="date"]').forEach(input => { if (!input.value) input.value = today; });
-  document.getElementById('rankingMonth').value = today.slice(0,7);
+  ['#expenseForm input[name="date"]', '#incomeForm input[name="date"]', '#editForm input[name="date"]'].forEach(selector => {
+    const input = document.querySelector(selector);
+    if (input && !input.value) input.value = today;
+  });
+  const rankingMonth = document.getElementById('rankingMonth');
+  if (rankingMonth && !rankingMonth.value) rankingMonth.value = today.slice(0,7);
 }
 
 function addEntriesFromForm(form, type) {
@@ -214,6 +243,7 @@ function addEntriesFromForm(form, type) {
   if (categorySelect) categorySelect.value = '';
   refreshUI();
   showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
+  if (type === 'income') playCashSound();
 }
 
 function createEntry({ type, description, amount, date, category, notes, batchId = '' }) {
@@ -257,6 +287,7 @@ function refreshUI() {
   renderSearchResults(state.entries);
   renderRanking();
   updatePreviews();
+  applyAnimationPreference();
 }
 
 function renderCategories() {
@@ -274,7 +305,7 @@ function renderCategories() {
     allOpt.value = '';
     allOpt.textContent = 'Todas';
     searchSelect.appendChild(allOpt);
-    state.incomeCategories.forEach(cat => {
+    sortCategories(state.incomeCategories).forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;
@@ -285,7 +316,7 @@ function renderCategories() {
     divider.textContent = ',-------,';
     divider.disabled = true;
     searchSelect.appendChild(divider);
-    state.expenseCategories.forEach(cat => {
+    sortCategories(state.expenseCategories).forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;
@@ -310,7 +341,7 @@ function populateCategorySelect(select, categories, includePlaceholder = false, 
     placeholder.selected = !current;
     select.appendChild(placeholder);
   }
-  categories.forEach(cat => {
+  sortCategories(categories).forEach(cat => {
     const option = document.createElement('option');
     option.value = cat;
     option.textContent = cat;
@@ -331,7 +362,7 @@ function renderCategoryChips(type) {
   const categories = type === 'income' ? state.incomeCategories : state.expenseCategories;
   if (!container) return;
   container.innerHTML = '';
-  categories.forEach(cat => {
+  sortCategories(categories).forEach(cat => {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<span>${cat}</span>`;
@@ -365,6 +396,7 @@ function handleCategoryAdd(type) {
     return;
   }
   list.push(value);
+  if (type === 'income') state.incomeCategories = sortCategories(list); else state.expenseCategories = sortCategories(list);
   saveState();
   input.value = '';
   refreshUI();
@@ -388,6 +420,7 @@ function handleCategoryAction(event) {
     }
     const idx = list.indexOf(category);
     if (idx >= 0) list[idx] = trimmed;
+    if (type === 'income') state.incomeCategories = sortCategories(list); else state.expenseCategories = sortCategories(list);
     state.entries.filter(e => e.type === (type === 'income' ? 'income' : 'expense') && e.category === category)
       .forEach(e => e.category = trimmed);
     saveState();
@@ -428,9 +461,20 @@ function renderDashboard() {
 
   const recentList = document.getElementById('recentList');
   recentList.innerHTML = '';
+  const today = toInputDate(new Date());
   const sorted = [...state.entries].sort((a,b) => new Date(b.date) - new Date(a.date));
+  let dividerInserted = false;
   sorted.forEach(entry => {
+    if (!dividerInserted && entry.date <= today) {
+      const divider = document.createElement('li');
+      divider.className = 'list-divider';
+      divider.textContent = 'Hoy y anteriores';
+      recentList.appendChild(divider);
+      dividerInserted = true;
+    }
     const li = document.createElement('li');
+    li.classList.toggle('future', entry.date > today);
+    li.classList.toggle('today', entry.date === today);
     const left = document.createElement('div');
     left.innerHTML = `<strong>${entry.description}</strong><br><small>${formatDate(entry.date)} · ${entry.category}</small>`;
     const amount = document.createElement('span');
@@ -440,11 +484,16 @@ function renderDashboard() {
     li.addEventListener('click', () => openEntryFromShortcut(entry.id));
     recentList.appendChild(li);
   });
+  alignRecentList(recentList);
 }
 
 function renderMonthlyViews() {
   const grouped = groupByMonth(state.entries);
-  const rows = Object.entries(grouped).sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  const from = document.getElementById('monthlyFrom').value;
+  const to = document.getElementById('monthlyTo').value;
+  const rows = Object.entries(grouped)
+    .filter(([month]) => (!from || month >= from) && (!to || month <= to))
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
   const tbody = document.getElementById('monthlyTable');
   tbody.innerHTML = '';
   const labels = [];
@@ -457,7 +506,8 @@ function renderMonthlyViews() {
     const expense = sumByType(entries, 'expense');
     const balance = income - expense;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${formatMonthLabel(month)}</td><td>${formatCurrency(income, currency)}</td><td>${formatCurrency(expense, currency)}</td><td class="${balance<0?'amount negative':''}">${formatCurrency(balance, currency)}</td>`;
+    tr.classList.toggle('future-row', month > toInputDate(new Date()).slice(0,7));
+    tr.innerHTML = `<td>${formatMonthLabel(month)}</td><td class="amount positive">${formatCurrency(income, currency)}</td><td class="amount negative">${formatCurrency(expense, currency)}</td><td class="${balance<0?'amount negative':''}">${formatCurrency(balance, currency)}</td>`;
     tbody.appendChild(tr);
     labels.push(formatMonthLabel(month));
     incomeData.push(income);
@@ -503,7 +553,10 @@ function handleSearch(e) {
     return matchText && matchCat && afterFrom && beforeTo;
   });
 
+  selectedEntryId = null;
+  document.getElementById('entryEditor').classList.add('hidden');
   renderSearchResults(results);
+  if (!results.length) showMessage('No se encontraron resultados para el criterio elegido.', 'error');
 }
 
 function renderSearchResults(list) {
@@ -521,6 +574,11 @@ function renderSearchResults(list) {
     tr.addEventListener('click', () => openEditor(entry.id));
     fragment.appendChild(tr);
   });
+  if (!list.length) {
+    const empty = document.createElement('tr');
+    empty.innerHTML = '<td colspan="6" class="muted">Sin resultados para esta búsqueda.</td>';
+    fragment.appendChild(empty);
+  }
   tbody.appendChild(fragment);
 }
 
@@ -660,6 +718,8 @@ function clearSearchText() {
   if (!input) return;
   input.value = '';
   input.focus();
+  selectedEntryId = null;
+  document.getElementById('entryEditor').classList.add('hidden');
   renderSearchResults(state.entries);
 }
 
@@ -855,4 +915,27 @@ function applyTheme(theme) {
 
 function updatePreviews() {
   document.getElementById('themePreview').textContent = state.theme === 'dark' ? 'Oscuro' : 'Claro';
+}
+
+function sortCategories(list) {
+  return [...list].sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
+function playCashSound() {
+  if (!state.soundEnabled) return;
+  CASH_SOUND.currentTime = 0;
+  CASH_SOUND.play().catch(() => {});
+}
+
+function applyAnimationPreference() {
+  document.body.classList.toggle('animations-enabled', !!state.animationsEnabled);
+}
+
+function alignRecentList(listEl) {
+  const divider = listEl.querySelector('.list-divider');
+  if (divider) {
+    listEl.scrollTop = divider.offsetTop - listEl.offsetTop;
+  } else {
+    listEl.scrollTop = 0;
+  }
 }
