@@ -116,8 +116,16 @@
         <p>Totales históricos y gráfico de tendencia</p>
       </div>
       <div class="panel-content">
+        <form class="form-row">
+          <label>Desde
+            <input type="month" id="monthlyFrom" aria-label="Mes desde">
+          </label>
+          <label>Hasta
+            <input type="month" id="monthlyTo" aria-label="Mes hasta">
+          </label>
+        </form>
         <div class="table-wrapper">
-          <table>
+          <table class="monthly-table">
             <thead>
               <tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr>
             </thead>
@@ -240,6 +248,16 @@
       </div>
       <div class="form-card">
         <p>Tema actual: <strong id="themePreview"></strong></p>
+        <label class="toggle">
+          <input type="checkbox" id="soundToggle" checked>
+          <span class="slider"></span>
+          <span class="toggle-label">Sonidos de ingreso</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="animationsToggle" checked>
+          <span class="slider"></span>
+          <span class="toggle-label">Animaciones</span>
+        </label>
       </div>
       <div class="form-card">
         <h3>Reseteo rápido</h3>
