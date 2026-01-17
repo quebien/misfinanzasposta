@@ -67,4 +67,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.tauri_args }}
+          tagName: ${{ github.event.release.tag_name }}
+          releaseId: ${{ github.event.release.id }}
+          releaseName: ${{ github.event.release.name }}
+          releaseBody: ${{ github.event.release.body }}
+          prerelease: ${{ github.event.release.prerelease }}
+          draft: ${{ github.event.release.draft }}
+
+      - name: upload artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-bundles-${{ matrix.platform }}-${{ matrix.rust_target }}
+          path: |
+            src-tauri/target/release/bundle/**
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**
 
