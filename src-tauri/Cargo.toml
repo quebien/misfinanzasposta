@@ -1,0 +1,15 @@
+[package]
+name = "mis_finanzas_posta"
+version = "0.1.0"
+description = "Mis Finanzas Posta desktop application"
+authors = ["Mis Finanzas Contributors"]
+edition = "2021"
+
+[dependencies]
+# Pull in Tauri as a dependency. The api-all feature exposes all JavaScript APIs,
+# simplifying integration with the existing frontend. You can lock to a
+# specific version if desired.
+tauri = { version = "1.5", features = ["api-all"] }
+
+[build-dependencies]
+tauri-build = { version = "1.5" }
