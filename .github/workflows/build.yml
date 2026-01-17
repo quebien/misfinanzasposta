@@ -51,7 +51,7 @@ jobs:
       # Build and package the Tauri app. The action will automatically run
       # `cargo tauri build` and upload the generated bundles as release
       # artifacts when a release is created.
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
