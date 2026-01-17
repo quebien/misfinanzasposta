@@ -75,11 +75,14 @@ jobs:
           prerelease: ${{ github.event.release.prerelease }}
           draft: ${{ github.event.release.draft }}
 
-      - name: upload artifacts (always)
+      - name: upload bundles (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-bundles-${{ matrix.platform }}-${{ matrix.rust_target }}
+          name: bundles-${{ matrix.platform }}-${{ matrix.rust_target }}
+          if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/**
+            src-tauri/target/**/bundle/**
+            **/src-tauri/target/**/bundle/**
+
 
