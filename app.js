@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const DEFAULT_CURRENCY = '$';
 const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
 CASH_SOUND.preload = 'auto';
@@ -844,6 +844,34 @@ function drawRankChart(canvasId, dataObj, label, color, kind) {
   if (kind === 'income' && incomeRankChart) incomeRankChart.destroy();
   const labels = Object.keys(dataObj);
   const values = Object.values(dataObj);
+  const descriptionPlugin = {
+    id: `${kind}-bar-description`,
+    afterDatasetsDraw(chart) {
+      const dataset = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      const textColor = getComputedStyle(document.body).getPropertyValue('--text');
+      const { left, right } = chart.chartArea;
+      chart.ctx.save();
+      chart.ctx.fillStyle = textColor;
+      chart.ctx.font = '600 12px Inter, sans-serif';
+      chart.ctx.textBaseline = 'middle';
+      meta.data.forEach((bar, index) => {
+        const value = Number(dataset.data[index]);
+        if (!value) return;
+        const text = `${labels[index]}: ${formatCurrency(value)}`;
+        const textWidth = chart.ctx.measureText(text).width;
+        let x = bar.x + 8;
+        if (x + textWidth > right) {
+          x = bar.x - 8 - textWidth;
+        }
+        if (x < left) {
+          x = left + 4;
+        }
+        chart.ctx.fillText(text, x, bar.y);
+      });
+      chart.ctx.restore();
+    }
+  };
   const chart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -857,7 +885,8 @@ function drawRankChart(canvasId, dataObj, label, color, kind) {
         x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text') } },
         y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text') } }
       }
-    }
+    },
+    plugins: [descriptionPlugin]
   });
   if (kind === 'expense') expenseRankChart = chart; else incomeRankChart = chart;
 }
