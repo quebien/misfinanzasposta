@@ -189,6 +189,7 @@ tr.future-row { background: linear-gradient(90deg, rgba(124,157,255,0.12), trans
 .selected-row { background: rgba(16,163,127,0.12); }
 
 footer { text-align: center; color: var(--muted); padding: 16px; }
+.alert { color: var(--danger); font-weight: 700; }
 
 .toggle { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .toggle input { display: none; }
@@ -215,6 +216,7 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .file-label { cursor: pointer; }
 .file-label input { display: none; }
+#monthlyChart { margin: 12px 0 16px; }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }

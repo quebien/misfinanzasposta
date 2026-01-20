@@ -124,6 +124,7 @@
             <input type="month" id="monthlyTo" aria-label="Mes hasta">
           </label>
         </form>
+        <canvas id="monthlyChart" height="140"></canvas>
         <div class="table-wrapper">
           <table class="monthly-table">
             <thead>
@@ -132,7 +133,6 @@
             <tbody id="monthlyTable"></tbody>
           </table>
         </div>
-        <canvas id="monthlyChart" height="140"></canvas>
       </div>
     </section>
 
@@ -274,6 +274,7 @@
       <div class="form-card">
         <h3>Backup y restauración</h3>
         <p class="muted">Descargá un backup de tus datos o restauralo cuando lo necesites.</p>
+        <p id="lastBackupInfo" class="muted"></p>
         <div class="button-row">
           <button type="button" id="downloadBackup">Descargar backup</button>
           <label class="file-label">
