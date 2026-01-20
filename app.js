@@ -1,9 +1,17 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.5.0';
 const DEFAULT_CURRENCY = '$';
-const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
-CASH_SOUND.preload = 'auto';
-CASH_SOUND.volume = 0.4;
+const INCOME_SOUND = new Audio('income_pop.mp3');
+const EXPENSE_SOUND = new Audio('expense_store.mp3');
+const TAB_SOUND = new Audio('tab_switch.mp3');
+const SOUND_VOLUME = 0.45;
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let prefersReducedMotion = motionQuery.matches;
+
+[INCOME_SOUND, EXPENSE_SOUND, TAB_SOUND].forEach(sound => {
+  sound.preload = 'auto';
+  sound.volume = SOUND_VOLUME;
+});
 
 function normalizeEntry(entry) {
   return {
@@ -23,6 +31,7 @@ function init() {
   bindTabs();
   bindForms();
   bindControls();
+  setupMotionPreference();
   applyTheme(state.theme || 'light');
   applyAnimationPreference();
   document.getElementById('themeToggle').checked = state.theme === 'dark';
@@ -99,16 +108,8 @@ function shiftDays(date, delta) {
 function bindTabs() {
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.target).classList.add('active');
-      if (btn.dataset.target === 'dashboard') {
-        renderMonth();
-        renderDashboard();
-      }
+      switchTab(btn.dataset.target, { playSound: true, animate: true });
       if (btn.dataset.target === 'search') {
-        focusSearchInput();
         selectedEntryId = null;
         document.getElementById('entryEditor').classList.add('hidden');
       }
@@ -245,7 +246,7 @@ function addEntriesFromForm(form, type) {
   if (categorySelect) categorySelect.value = '';
   refreshUI();
   showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
-  if (type === 'income') playCashSound();
+  triggerEntryFeedback(type, form);
 }
 
 function createEntry({ type, description, amount, date, category, notes, batchId = '' }) {
@@ -694,18 +695,8 @@ function openEntryFromShortcut(entryId) {
   openEditor(entryId);
 }
 
-function switchTab(targetId) {
-  document.querySelectorAll('.tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.target === targetId);
-  });
-  document.querySelectorAll('.panel').forEach(p => {
-    p.classList.toggle('active', p.id === targetId);
-  });
-  if (targetId === 'search') focusSearchInput();
-  if (targetId === 'dashboard') {
-    renderMonth();
-    renderDashboard();
-  }
+function switchTab(targetId, options = { playSound: true, animate: true }) {
+  switchTabWithEffects(targetId, options);
 }
 
 function focusSearchInput() {
@@ -998,14 +989,175 @@ function getBackupInfo() {
   return { text, status: stale ? 'danger' : 'ok' };
 }
 
-function playCashSound() {
-  if (!state.soundEnabled) return;
-  CASH_SOUND.currentTime = 0;
-  CASH_SOUND.play().catch(() => {});
-}
-
 function applyAnimationPreference() {
   document.body.classList.toggle('animations-enabled', !!state.animationsEnabled);
+  document.body.classList.toggle('reduced-motion', prefersReducedMotion);
+}
+
+function setupMotionPreference() {
+  const updatePreference = () => {
+    prefersReducedMotion = motionQuery.matches;
+    applyAnimationPreference();
+  };
+  updatePreference();
+  if (motionQuery.addEventListener) {
+    motionQuery.addEventListener('change', updatePreference);
+  } else {
+    motionQuery.addListener(updatePreference);
+  }
+}
+
+function shouldAnimate() {
+  return state.animationsEnabled && !prefersReducedMotion;
+}
+
+function shouldReduceMotion() {
+  return state.animationsEnabled && prefersReducedMotion;
+}
+
+function playSound(sound) {
+  if (!state.soundEnabled) return;
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
+}
+
+function triggerEntryFeedback(type, form) {
+  if (type === 'income') {
+    playSound(INCOME_SOUND);
+    triggerIncomeCelebration(form);
+  } else {
+    playSound(EXPENSE_SOUND);
+    triggerExpenseStore(form);
+  }
+}
+
+function triggerIncomeCelebration(form) {
+  if (!form) return;
+  const card = form.closest('.form-card');
+  if (!card) return;
+  if (!state.animationsEnabled) return;
+  if (shouldAnimate()) {
+    launchConfetti(card, form.querySelector('button[type="submit"]'));
+  }
+  pulseTotals(['monthIncome', 'monthBalance'], shouldReduceMotion());
+}
+
+function triggerExpenseStore(form) {
+  if (!form) return;
+  const card = form.closest('.form-card');
+  if (card) {
+    const className = shouldAnimate() ? 'expense-store' : (shouldReduceMotion() ? 'expense-store-min' : '');
+    if (className) {
+      card.classList.remove('expense-store', 'expense-store-min');
+      card.classList.add(className);
+      card.addEventListener('animationend', () => {
+        card.classList.remove(className);
+      }, { once: true });
+    }
+  }
+  const list = document.getElementById('recentList');
+  if (list) {
+    const snapClass = shouldAnimate() ? 'snap' : (shouldReduceMotion() ? 'snap-min' : '');
+    if (snapClass) {
+      list.classList.remove('snap', 'snap-min');
+      list.classList.add(snapClass);
+      list.addEventListener('animationend', () => {
+        list.classList.remove(snapClass);
+      }, { once: true });
+    }
+  }
+}
+
+function pulseTotals(ids, reduced) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('pulse-pop', 'pulse-pop-min');
+    el.classList.add(reduced ? 'pulse-pop-min' : 'pulse-pop');
+    el.addEventListener('animationend', () => {
+      el.classList.remove('pulse-pop', 'pulse-pop-min');
+    }, { once: true });
+  });
+}
+
+function launchConfetti(container, originTarget) {
+  const rect = container.getBoundingClientRect();
+  const originRect = originTarget ? originTarget.getBoundingClientRect() : rect;
+  const origin = {
+    x: originRect.left - rect.left + originRect.width / 2,
+    y: originRect.top - rect.top + originRect.height / 2
+  };
+  const layer = document.createElement('div');
+  layer.className = 'fx-layer';
+  container.appendChild(layer);
+  const colors = ['#16a34a', '#22d3a6', '#7c9dff', '#facc15', '#fb7185'];
+  const particleCount = 18;
+  const duration = 1300;
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('span');
+    particle.className = 'confetti';
+    particle.style.background = colors[i % colors.length];
+    particle.style.left = `${origin.x}px`;
+    particle.style.top = `${origin.y}px`;
+    layer.appendChild(particle);
+    const dx = (Math.random() - 0.5) * 220;
+    const dy = (Math.random() - 1.1) * 180;
+    const rot = (Math.random() * 260) - 130;
+    particle.animate([
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) scale(0.6) rotate(${rot}deg)`, opacity: 0 }
+    ], {
+      duration,
+      easing: 'cubic-bezier(0.22, 1.02, 0.4, 1)',
+      fill: 'forwards'
+    });
+  }
+  setTimeout(() => layer.remove(), duration + 50);
+}
+
+function switchTabWithEffects(targetId, { playSound: allowSound, animate } = {}) {
+  const panels = Array.from(document.querySelectorAll('.panel'));
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const currentPanel = document.querySelector('.panel.active');
+  const currentId = currentPanel?.id;
+  if (currentId === targetId) return;
+  const nextPanel = document.getElementById(targetId);
+  if (!nextPanel) return;
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.target === targetId));
+  panels.forEach(p => p.classList.toggle('active', p.id === targetId));
+  if (animate && state.animationsEnabled) {
+    const direction = getTabDirection(tabs, currentId, targetId);
+    applyTabAnimation(nextPanel, direction);
+  }
+  if (allowSound) {
+    playSound(TAB_SOUND);
+  }
+  if (targetId === 'search') focusSearchInput();
+  if (targetId === 'dashboard') {
+    renderMonth();
+    renderDashboard();
+  }
+}
+
+function getTabDirection(tabs, currentId, nextId) {
+  const getIndex = id => tabs.findIndex(tab => tab.dataset.target === id);
+  const currentIndex = currentId ? getIndex(currentId) : 0;
+  const nextIndex = getIndex(nextId);
+  if (nextIndex === -1) return 1;
+  return nextIndex >= currentIndex ? 1 : -1;
+}
+
+function applyTabAnimation(panel, direction) {
+  panel.classList.remove('arcade-enter', 'arcade-enter-min');
+  panel.style.setProperty('--tab-slide', `${direction * 60}px`);
+  if (shouldAnimate()) {
+    panel.classList.add('arcade-enter');
+  } else if (shouldReduceMotion()) {
+    panel.classList.add('arcade-enter-min');
+  }
+  panel.addEventListener('animationend', () => {
+    panel.classList.remove('arcade-enter', 'arcade-enter-min');
+  }, { once: true });
 }
 
 function alignRecentList(listEl) {
