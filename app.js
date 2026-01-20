@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const DEFAULT_CURRENCY = '$';
 const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
 CASH_SOUND.preload = 'auto';
@@ -29,7 +29,7 @@ function init() {
   document.getElementById('soundToggle').checked = state.soundEnabled;
   document.getElementById('animationsToggle').checked = state.animationsEnabled;
   document.getElementById('versionBadge').textContent = `v${APP_VERSION}`;
-  document.getElementById('footerText').textContent = `Mis Finanzas Posta versión ${APP_VERSION} · Desarrollado por Andrés B.M. Carizza e IA`;
+  updateFooterText();
   renderCategories();
   renderMonth();
   renderDashboard();
@@ -37,6 +37,7 @@ function init() {
   renderSearchResults(state.entries);
   renderRanking();
   updatePreviews();
+  updateBackupInfo();
 }
 
 function loadState() {
@@ -50,7 +51,8 @@ function loadState() {
       expenseCategories: sortCategories(parsed.expenseCategories ? [...parsed.expenseCategories] : (parsed.categories ? [...parsed.categories] : [])),
       currency: DEFAULT_CURRENCY,
       soundEnabled: parsed.soundEnabled !== undefined ? parsed.soundEnabled : true,
-      animationsEnabled: parsed.animationsEnabled !== undefined ? parsed.animationsEnabled : true
+      animationsEnabled: parsed.animationsEnabled !== undefined ? parsed.animationsEnabled : true,
+      lastBackupAt: parsed.lastBackupAt || null
     };
   }
   return seedData();
@@ -78,7 +80,7 @@ function seedData() {
 
   sample.forEach((item, idx) => entries.push({ ...item, id: idx + 1, date: toInputDate(item.date) }));
 
-  const initial = { entries: entries.map(normalizeEntry), incomeCategories: sortCategories(incomeCategories), expenseCategories: sortCategories(expenseCategories), currency: DEFAULT_CURRENCY, theme: 'light', soundEnabled: true, animationsEnabled: true };
+  const initial = { entries: entries.map(normalizeEntry), incomeCategories: sortCategories(incomeCategories), expenseCategories: sortCategories(expenseCategories), currency: DEFAULT_CURRENCY, theme: 'light', soundEnabled: true, animationsEnabled: true, lastBackupAt: null };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
@@ -288,6 +290,7 @@ function refreshUI() {
   renderRanking();
   updatePreviews();
   applyAnimationPreference();
+  updateBackupInfo();
 }
 
 function renderCategories() {
@@ -509,9 +512,14 @@ function renderMonthlyViews() {
     tr.classList.toggle('future-row', month > toInputDate(new Date()).slice(0,7));
     tr.innerHTML = `<td>${formatMonthLabel(month)}</td><td class="amount positive">${formatCurrency(income, currency)}</td><td class="amount negative">${formatCurrency(expense, currency)}</td><td class="${balance<0?'amount negative':''}">${formatCurrency(balance, currency)}</td>`;
     tbody.appendChild(tr);
+  });
+
+  const todayMonth = toInputDate(new Date()).slice(0,7);
+  const chartRows = rows.filter(([month]) => month <= todayMonth);
+  chartRows.forEach(([month, entries]) => {
     labels.push(formatMonthLabel(month));
-    incomeData.push(income);
-    expenseData.push(expense);
+    incomeData.push(sumByType(entries, 'income'));
+    expenseData.push(sumByType(entries, 'expense'));
   });
 
   const ctx = document.getElementById('monthlyChart').getContext('2d');
@@ -772,6 +780,10 @@ function downloadBackup() {
   URL.revokeObjectURL(url);
   const preview = document.getElementById('backupPreview');
   if (preview) preview.value = data;
+  state.lastBackupAt = new Date().toISOString();
+  saveState();
+  updateBackupInfo();
+  updateFooterText();
   showMessage('Backup descargado.', 'success');
 }
 
@@ -790,7 +802,8 @@ function restoreFromFile(event) {
         incomeCategories: parsed.incomeCategories ? [...parsed.incomeCategories] : [],
         expenseCategories: parsed.expenseCategories ? [...parsed.expenseCategories] : [],
         currency: parsed.currency || DEFAULT_CURRENCY,
-        theme: parsed.theme || 'light'
+        theme: parsed.theme || 'light',
+        lastBackupAt: parsed.lastBackupAt || state.lastBackupAt
       };
       saveState();
       applyTheme(state.theme);
@@ -800,6 +813,7 @@ function restoreFromFile(event) {
       selectedEntryId = null;
       document.getElementById('entryEditor').classList.add('hidden');
       refreshUI();
+      updateFooterText();
       showMessage('Backup restaurado con éxito.', 'success');
     } catch (err) {
       console.error(err);
@@ -858,14 +872,14 @@ function drawRankChart(canvasId, dataObj, label, color, kind) {
       meta.data.forEach((bar, index) => {
         const value = Number(dataset.data[index]);
         if (!value) return;
-        const text = `${labels[index]}: ${formatCurrency(value)}`;
+        const text = formatCurrency(value);
         const textWidth = chart.ctx.measureText(text).width;
-        let x = bar.x + 8;
-        if (x + textWidth > right) {
-          x = bar.x - 8 - textWidth;
-        }
-        if (x < left) {
-          x = left + 4;
+        let x = bar.x - 8 - textWidth;
+        if (x < left + 4) {
+          x = bar.x + 8;
+          if (x + textWidth > right) {
+            x = Math.max(left + 4, right - textWidth - 4);
+          }
         }
         chart.ctx.fillText(text, x, bar.y);
       });
@@ -948,6 +962,37 @@ function updatePreviews() {
 
 function sortCategories(list) {
   return [...list].sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
+function updateBackupInfo() {
+  const info = getBackupInfo();
+  const infoEl = document.getElementById('lastBackupInfo');
+  if (!infoEl) return;
+  infoEl.textContent = info.text;
+  infoEl.classList.toggle('alert', info.stale);
+}
+
+function updateFooterText() {
+  const info = getBackupInfo();
+  const footer = document.getElementById('footerText');
+  if (!footer) return;
+  const backupHtml = info.stale ? `<span class="alert">${info.text}</span>` : info.text;
+  footer.innerHTML = `Mis Finanzas Posta versión ${APP_VERSION} · Desarrollado por Andrés B.M. Carizza · ${backupHtml}`;
+}
+
+function getBackupInfo() {
+  if (!state.lastBackupAt) {
+    return { text: 'Último backup descargado: todavía no.', stale: false };
+  }
+  const last = new Date(state.lastBackupAt);
+  const monthAgo = new Date();
+  monthAgo.setMonth(monthAgo.getMonth() - 1);
+  const stale = last < monthAgo;
+  const formatted = last.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const text = stale
+    ? `Último backup descargado: ${formatted} (hace más de un mes)`
+    : `Último backup descargado: ${formatted}`;
+  return { text, stale };
 }
 
 function playCashSound() {
