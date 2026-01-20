@@ -105,6 +105,8 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .animations-enabled .list li { animation: fadeInUp 0.4s ease; }
 .animations-enabled .tab.active { transition: transform 0.25s ease, background 0.2s; transform: translateY(-2px); }
 .animations-enabled .list li:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.panel.arcade-enter { animation: tabArcade 520ms cubic-bezier(0.22, 1.05, 0.36, 1); }
+.panel.arcade-enter-min { animation: tabArcadeReduced 180ms ease-out; }
 
 .panel-header h2 { margin: 0 0 4px; }
 .panel-header p { margin: 0; color: var(--muted); }
@@ -137,6 +139,8 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .list-divider { text-align: center; font-weight: 700; color: var(--muted); border-style: dashed; }
 .list li.future { border-color: #7c9dff; background: linear-gradient(135deg, rgba(124,157,255,0.14), var(--panel)); }
 .list li.today { border-color: var(--accent); }
+.list.snap { animation: listSnap 520ms cubic-bezier(0.22, 1.02, 0.38, 1); }
+.list.snap-min { animation: listSnapReduced 180ms ease-out; }
 
 .two-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .form-card {
@@ -147,6 +151,7 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
   box-shadow: var(--shadow);
   display: grid;
   gap: 10px;
+  position: relative;
 }
 
 label { display: grid; gap: 6px; font-weight: 600; }
@@ -160,6 +165,24 @@ button[type="submit"], #addCategory { background: linear-gradient(135deg, var(--
 button.btn-expense { background: linear-gradient(135deg, #ef4444, #b91c1c); }
 button.btn-income { background: linear-gradient(135deg, #16a34a, #15803d); }
 button:hover { opacity: 0.93; }
+.expense-store { animation: expenseStore 600ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.expense-store-min { animation: expenseStoreReduced 200ms ease-out; }
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+  opacity: 0;
+}
+.pulse-pop { animation: popPulse 1200ms cubic-bezier(0.22, 1.02, 0.38, 1); }
+.pulse-pop-min { animation: popPulseReduced 200ms ease-out; }
 
 .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
 .table-wrapper.search-table { max-height: 60vh; overflow-y: auto; }
@@ -224,6 +247,63 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tabArcade {
+  0% { opacity: 0; transform: translateX(var(--tab-slide, 60px)) scale(0.96); }
+  60% { opacity: 1; transform: translateX(calc(var(--tab-slide, 60px) * -0.08)) scale(1.03); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes tabArcadeReduced {
+  from { opacity: 0.7; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes popPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  70% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+@keyframes popPulseReduced {
+  from { transform: scale(1); }
+  to { transform: scale(1.02); }
+}
+
+@keyframes expenseStore {
+  0% { transform: translateX(0) scale(1); box-shadow: var(--shadow); }
+  55% { transform: translateX(-12px) translateY(12px) scale(0.98); box-shadow: 0 6px 16px rgba(17, 29, 60, 0.12); }
+  100% { transform: translateX(0) scale(1); box-shadow: var(--shadow); }
+}
+
+@keyframes expenseStoreReduced {
+  from { transform: scale(1); }
+  to { transform: scale(0.99); }
+}
+
+@keyframes listSnap {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(6px); }
+  70% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes listSnapReduced {
+  from { transform: translateY(0); }
+  to { transform: translateY(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animations-enabled .panel-header,
+  .animations-enabled .card,
+  .animations-enabled .form-card,
+  .animations-enabled .chart-card,
+  .animations-enabled .list li {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
 }
 
 @media (max-width: 680px) {
