@@ -105,18 +105,8 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .animations-enabled .list li { animation: fadeInUp 0.4s ease; }
 .animations-enabled .tab.active { transition: transform 0.25s ease, background 0.2s; transform: translateY(-2px); }
 .animations-enabled .list li:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.panel.arcade-enter { animation: tabArcade 1750ms cubic-bezier(0.2, 0.9, 0.2, 1); }
-.panel.arcade-enter-min { animation: tabArcadeReduced 260ms ease-out; }
-.panel.arcade-enter::before {
-  content: '';
-  position: absolute;
-  inset: -20% -10%;
-  background: linear-gradient(120deg, transparent 20%, rgba(124,157,255,0.35), transparent 70%);
-  filter: blur(10px);
-  opacity: 0;
-  animation: tabWhoosh 1750ms ease-out;
-  pointer-events: none;
-}
+.panel.arcade-enter { animation: tabArcade 520ms cubic-bezier(0.22, 1.05, 0.36, 1); }
+.panel.arcade-enter-min { animation: tabArcadeReduced 180ms ease-out; }
 
 .panel-header h2 { margin: 0 0 4px; }
 .panel-header p { margin: 0; color: var(--muted); }
@@ -149,10 +139,8 @@ main { padding: 0 12px 40px; max-width: 1200px; margin: auto; }
 .list-divider { text-align: center; font-weight: 700; color: var(--muted); border-style: dashed; }
 .list li.future { border-color: #7c9dff; background: linear-gradient(135deg, rgba(124,157,255,0.14), var(--panel)); }
 .list li.today { border-color: var(--accent); }
-.list.snap,
-.search-table.snap { animation: listSnap 1750ms cubic-bezier(0.2, 0.9, 0.2, 1); }
-.list.snap-min,
-.search-table.snap-min { animation: listSnapReduced 260ms ease-out; }
+.list.snap { animation: listSnap 520ms cubic-bezier(0.22, 1.02, 0.38, 1); }
+.list.snap-min { animation: listSnapReduced 180ms ease-out; }
 
 .two-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .form-card {
@@ -177,85 +165,24 @@ button[type="submit"], #addCategory { background: linear-gradient(135deg, var(--
 button.btn-expense { background: linear-gradient(135deg, #ef4444, #b91c1c); }
 button.btn-income { background: linear-gradient(135deg, #16a34a, #15803d); }
 button:hover { opacity: 0.93; }
-.expense-store { animation: expenseStore 1750ms cubic-bezier(0.2, 0.9, 0.2, 1); }
-.expense-store-min { animation: expenseStoreReduced 260ms ease-out; }
+.expense-store { animation: expenseStore 600ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.expense-store-min { animation: expenseStoreReduced 200ms ease-out; }
 .fx-layer {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: visible;
-  z-index: 40;
 }
-.fx-layer.income-burst { z-index: 50; }
 .confetti {
   position: absolute;
-  border-radius: 4px;
-  box-shadow: 0 10px 18px rgba(0,0,0,0.2);
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.15);
   opacity: 0;
-  animation: confettiBurst 1750ms cubic-bezier(0.2, 0.9, 0.2, 1) var(--fx-delay, 0ms) forwards;
 }
-.income-glow {
-  position: absolute;
-  width: min(360px, 70vw);
-  height: min(360px, 70vw);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(34,211,166,0.5), transparent 70%);
-  animation: glowPulse 1750ms cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-.income-spotlight {
-  position: absolute;
-  width: min(520px, 90vw);
-  height: min(520px, 90vw);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(124,157,255,0.45), transparent 70%);
-  animation: spotlightFlash 1750ms ease-out;
-}
-.expense-store-layer { z-index: 45; }
-.expense-ghost {
-  position: absolute;
-  border-radius: 16px;
-  background: rgba(239,68,68,0.08);
-  border: 1px solid rgba(239,68,68,0.35);
-  box-shadow: 0 18px 40px rgba(17, 29, 60, 0.18);
-  animation: expenseStoreGhost 1750ms cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-.expense-folder {
-  position: absolute;
-  width: 140px;
-  height: 90px;
-  transform: translate(-50%, -50%);
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(124,157,255,0.4), rgba(124,157,255,0.15));
-  border: 1px solid rgba(124,157,255,0.6);
-  box-shadow: 0 12px 24px rgba(17, 29, 60, 0.18);
-  animation: folderSnap 1750ms cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-.expense-folder::before {
-  content: '';
-  position: absolute;
-  top: -16px;
-  left: 18px;
-  width: 64px;
-  height: 24px;
-  border-radius: 8px 8px 0 0;
-  background: rgba(124,157,255,0.55);
-}
-.expense-trails {
-  position: absolute;
-  width: 220px;
-  height: 120px;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(90deg, rgba(239,68,68,0.4), transparent);
-  filter: blur(6px);
-  opacity: 0;
-  animation: expenseTrail 1750ms ease-out;
-}
-.pulse-pop { animation: popPulse 1750ms cubic-bezier(0.2, 0.9, 0.2, 1); }
-.pulse-pop-min { animation: popPulseReduced 260ms ease-out; }
-.delete-sequence { animation: deleteSequence 1750ms ease-in-out forwards; }
-.delete-sequence-min { animation: deleteSequenceReduced 260ms ease-out forwards; }
+.pulse-pop { animation: popPulse 1200ms cubic-bezier(0.22, 1.02, 0.38, 1); }
+.pulse-pop-min { animation: popPulseReduced 200ms ease-out; }
 
 .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
 .table-wrapper.search-table { max-height: 60vh; overflow-y: auto; }
@@ -323,10 +250,9 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 }
 
 @keyframes tabArcade {
-  0% { opacity: 0; transform: translateX(var(--tab-slide, 120px)) scale(0.85) rotateY(-18deg); filter: blur(6px); }
-  20% { opacity: 1; transform: translateX(calc(var(--tab-slide, 120px) * 0.2)) scale(0.9) rotateY(12deg); filter: blur(2px); }
-  60% { transform: translateX(calc(var(--tab-slide, 120px) * -0.12)) scale(1.04) rotateY(-4deg); filter: blur(0); }
-  100% { opacity: 1; transform: translateX(0) scale(1) rotateY(0); filter: blur(0); }
+  0% { opacity: 0; transform: translateX(var(--tab-slide, 60px)) scale(0.96); }
+  60% { opacity: 1; transform: translateX(calc(var(--tab-slide, 60px) * -0.08)) scale(1.03); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 @keyframes tabArcadeReduced {
@@ -334,16 +260,9 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
   to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes tabWhoosh {
-  0% { opacity: 0; transform: translateX(-20%) scale(0.9); }
-  35% { opacity: 0.6; transform: translateX(10%) scale(1); }
-  100% { opacity: 0; transform: translateX(40%) scale(1.05); }
-}
-
 @keyframes popPulse {
   0% { transform: scale(1); }
-  15% { transform: scale(0.95); }
-  45% { transform: scale(1.12); }
+  40% { transform: scale(1.08); }
   70% { transform: scale(0.98); }
   100% { transform: scale(1); }
 }
@@ -355,8 +274,7 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 
 @keyframes expenseStore {
   0% { transform: translateX(0) scale(1); box-shadow: var(--shadow); }
-  20% { transform: translateX(-18px) translateY(16px) scale(0.97); box-shadow: 0 6px 16px rgba(17, 29, 60, 0.12); }
-  70% { transform: translateX(0) scale(1.02); box-shadow: 0 12px 24px rgba(17, 29, 60, 0.16); }
+  55% { transform: translateX(-12px) translateY(12px) scale(0.98); box-shadow: 0 6px 16px rgba(17, 29, 60, 0.12); }
   100% { transform: translateX(0) scale(1); box-shadow: var(--shadow); }
 }
 
@@ -367,74 +285,14 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 
 @keyframes listSnap {
   0% { transform: translateY(0); }
-  25% { transform: translateY(10px); }
-  55% { transform: translateY(-6px); }
-  80% { transform: translateY(4px); }
+  35% { transform: translateY(6px); }
+  70% { transform: translateY(-2px); }
   100% { transform: translateY(0); }
 }
 
 @keyframes listSnapReduced {
   from { transform: translateY(0); }
   to { transform: translateY(2px); }
-}
-
-@keyframes confettiBurst {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(0deg); }
-  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(10deg); }
-  55% { opacity: 1; transform: translate(calc(-50% + var(--fx-x)), calc(-50% + var(--fx-y))) scale(1) rotate(var(--fx-rotate)); }
-  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-x)), calc(-50% + var(--fx-y))) scale(0.6) rotate(calc(var(--fx-rotate) + 30deg)); }
-}
-
-@keyframes glowPulse {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
-  20% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.05); }
-  70% { opacity: 0.25; transform: translate(-50%, -50%) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
-}
-
-@keyframes spotlightFlash {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
-  30% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
-}
-
-@keyframes expenseStoreGhost {
-  0% { opacity: 0; transform: translate(0, 0) scale(1); }
-  15% { opacity: 1; transform: translate(-10px, 8px) scale(1.02); }
-  55% { opacity: 0.9; transform: translate(140px, 140px) scale(0.85); }
-  80% { opacity: 0.6; transform: translate(160px, 160px) scale(0.8); }
-  100% { opacity: 0; transform: translate(190px, 200px) scale(0.75); }
-}
-
-@keyframes folderSnap {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
-  55% { opacity: 1; transform: translate(-50%, -50%) scale(0.98); }
-  75% { opacity: 1; transform: translate(-50%, -50%) scale(1.03); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-}
-
-@keyframes expenseTrail {
-  0% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.7); }
-  30% { opacity: 0.6; transform: translate(-30%, -40%) scaleX(1); }
-  70% { opacity: 0.3; transform: translate(-20%, -10%) scaleX(1.1); }
-  100% { opacity: 0; transform: translate(10%, 20%) scaleX(1.2); }
-}
-
-@keyframes deleteSequence {
-  0% { transform: translateX(0); opacity: 1; filter: blur(0); }
-  10% { transform: translateX(-6px); }
-  20% { transform: translateX(6px); }
-  30% { transform: translateX(-4px); }
-  40% { transform: translateX(0); }
-  60% { opacity: 0.85; filter: blur(2px); }
-  80% { opacity: 0.4; filter: blur(6px); transform: scale(0.92) rotate(-2deg); }
-  100% { opacity: 0; filter: blur(10px); transform: scale(0.86) rotate(2deg); }
-}
-
-@keyframes deleteSequenceReduced {
-  from { opacity: 1; }
-  to { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

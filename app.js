@@ -1,20 +1,17 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.5.0';
 const DEFAULT_CURRENCY = '$';
 const INCOME_SOUND = new Audio('income_pop.mp3');
 const EXPENSE_SOUND = new Audio('expense_store.mp3');
 const TAB_SOUND = new Audio('tab_switch.mp3');
-const DELETE_SOUND = new Audio('delete_record.mp3');
 const SOUND_VOLUME = 0.45;
 const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 let prefersReducedMotion = motionQuery.matches;
 
-[INCOME_SOUND, EXPENSE_SOUND, TAB_SOUND, DELETE_SOUND].forEach(sound => {
+[INCOME_SOUND, EXPENSE_SOUND, TAB_SOUND].forEach(sound => {
   sound.preload = 'auto';
   sound.volume = SOUND_VOLUME;
 });
-const FX_DURATION = 1750;
-const FX_DURATION_REDUCED = 260;
 
 function normalizeEntry(entry) {
   return {
@@ -252,7 +249,7 @@ function addEntriesFromForm(form, type) {
   if (categorySelect) categorySelect.value = '';
   refreshUI();
   showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
-  triggerEntryFeedback(type, { cardRect, buttonRect });
+  triggerEntryFeedback(type, form);
 }
 
 function createEntry({ type, description, amount, date, category, notes, batchId = '' }) {
@@ -1031,38 +1028,51 @@ function playSound(sound) {
   sound.play().catch(() => {});
 }
 
-function triggerEntryFeedback(type, info = {}) {
+function triggerEntryFeedback(type, form) {
   if (type === 'income') {
     playSound(INCOME_SOUND);
-    triggerIncomeCelebration(info);
+    triggerIncomeCelebration(form);
   } else {
     playSound(EXPENSE_SOUND);
-    triggerExpenseStore(info);
+    triggerExpenseStore(form);
   }
 }
 
-function triggerIncomeCelebration({ cardRect, buttonRect } = {}) {
+function triggerIncomeCelebration(form) {
+  if (!form) return;
+  const card = form.closest('.form-card');
+  if (!card) return;
   if (!state.animationsEnabled) return;
   if (shouldAnimate()) {
-    const rect = cardRect || document.querySelector('#incomeForm')?.closest('.form-card')?.getBoundingClientRect();
-    const origin = buttonRect || document.querySelector('#incomeForm button[type="submit"]')?.getBoundingClientRect();
-    if (rect) {
-      launchConfetti(rect, origin || rect);
-      launchIncomeGlow(rect);
-    }
+    launchConfetti(card, form.querySelector('button[type="submit"]'));
   }
   pulseTotals(['monthIncome', 'monthBalance'], shouldReduceMotion());
 }
 
-function triggerExpenseStore({ cardRect } = {}) {
-  if (!state.animationsEnabled) return;
-  if (shouldAnimate()) {
-    const rect = cardRect || document.querySelector('#expenseForm')?.closest('.form-card')?.getBoundingClientRect();
-    if (rect) {
-      launchExpenseStore(rect);
+function triggerExpenseStore(form) {
+  if (!form) return;
+  const card = form.closest('.form-card');
+  if (card) {
+    const className = shouldAnimate() ? 'expense-store' : (shouldReduceMotion() ? 'expense-store-min' : '');
+    if (className) {
+      card.classList.remove('expense-store', 'expense-store-min');
+      card.classList.add(className);
+      card.addEventListener('animationend', () => {
+        card.classList.remove(className);
+      }, { once: true });
     }
   }
-  animateListsForReflow();
+  const list = document.getElementById('recentList');
+  if (list) {
+    const snapClass = shouldAnimate() ? 'snap' : (shouldReduceMotion() ? 'snap-min' : '');
+    if (snapClass) {
+      list.classList.remove('snap', 'snap-min');
+      list.classList.add(snapClass);
+      list.addEventListener('animationend', () => {
+        list.classList.remove(snapClass);
+      }, { once: true });
+    }
+  }
 }
 
 function pulseTotals(ids, reduced) {
@@ -1077,119 +1087,39 @@ function pulseTotals(ids, reduced) {
   });
 }
 
-function launchConfetti(cardRect, originRect) {
-  const layer = createFxLayer();
-  layer.classList.add('income-burst');
+function launchConfetti(container, originTarget) {
+  const rect = container.getBoundingClientRect();
+  const originRect = originTarget ? originTarget.getBoundingClientRect() : rect;
   const origin = {
-    x: originRect.left + originRect.width / 2,
-    y: originRect.top + originRect.height / 2
+    x: originRect.left - rect.left + originRect.width / 2,
+    y: originRect.top - rect.top + originRect.height / 2
   };
-  const colors = ['#16a34a', '#22d3a6', '#7c9dff', '#facc15', '#fb7185', '#a855f7'];
-  const particleCount = 26;
+  const layer = document.createElement('div');
+  layer.className = 'fx-layer';
+  container.appendChild(layer);
+  const colors = ['#16a34a', '#22d3a6', '#7c9dff', '#facc15', '#fb7185'];
+  const particleCount = 18;
+  const duration = 1300;
   for (let i = 0; i < particleCount; i++) {
     const particle = document.createElement('span');
     particle.className = 'confetti';
-    const angle = (Math.PI * 2 * i) / particleCount;
-    const distance = 180 + Math.random() * 140;
-    const dx = Math.cos(angle) * distance;
-    const dy = Math.sin(angle) * distance * 0.6 - 90;
-    particle.style.setProperty('--fx-x', `${dx}px`);
-    particle.style.setProperty('--fx-y', `${dy}px`);
-    particle.style.setProperty('--fx-delay', `${Math.random() * 120}ms`);
-    particle.style.setProperty('--fx-rotate', `${Math.random() * 260 - 130}deg`);
+    particle.style.background = colors[i % colors.length];
     particle.style.left = `${origin.x}px`;
     particle.style.top = `${origin.y}px`;
-    particle.style.background = colors[i % colors.length];
-    particle.style.width = `${14 + Math.random() * 10}px`;
-    particle.style.height = `${14 + Math.random() * 10}px`;
     layer.appendChild(particle);
+    const dx = (Math.random() - 0.5) * 220;
+    const dy = (Math.random() - 1.1) * 180;
+    const rot = (Math.random() * 260) - 130;
+    particle.animate([
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) scale(0.6) rotate(${rot}deg)`, opacity: 0 }
+    ], {
+      duration,
+      easing: 'cubic-bezier(0.22, 1.02, 0.4, 1)',
+      fill: 'forwards'
+    });
   }
-  const spotlight = document.createElement('span');
-  spotlight.className = 'income-spotlight';
-  spotlight.style.left = `${cardRect.left + cardRect.width / 2}px`;
-  spotlight.style.top = `${cardRect.top + cardRect.height / 2}px`;
-  layer.appendChild(spotlight);
-  cleanupFxLayer(layer, FX_DURATION + 200);
-}
-
-function launchIncomeGlow(cardRect) {
-  const layer = createFxLayer();
-  const glow = document.createElement('div');
-  glow.className = 'income-glow';
-  glow.style.left = `${cardRect.left + cardRect.width / 2}px`;
-  glow.style.top = `${cardRect.top + cardRect.height / 2}px`;
-  layer.appendChild(glow);
-  cleanupFxLayer(layer, FX_DURATION + 200);
-}
-
-function launchExpenseStore(cardRect) {
-  const layer = createFxLayer();
-  layer.classList.add('expense-store-layer');
-  const ghost = document.createElement('div');
-  ghost.className = 'expense-ghost';
-  ghost.style.left = `${cardRect.left}px`;
-  ghost.style.top = `${cardRect.top}px`;
-  ghost.style.width = `${cardRect.width}px`;
-  ghost.style.height = `${cardRect.height}px`;
-  layer.appendChild(ghost);
-  const folder = document.createElement('div');
-  folder.className = 'expense-folder';
-  const folderX = cardRect.left + cardRect.width * 0.72;
-  const folderY = cardRect.top + cardRect.height * 0.9;
-  folder.style.left = `${folderX}px`;
-  folder.style.top = `${folderY}px`;
-  layer.appendChild(folder);
-  const trails = document.createElement('div');
-  trails.className = 'expense-trails';
-  trails.style.left = `${cardRect.left + cardRect.width / 2}px`;
-  trails.style.top = `${cardRect.top + cardRect.height / 2}px`;
-  layer.appendChild(trails);
-  cleanupFxLayer(layer, FX_DURATION + 250);
-}
-
-function animateListsForReflow() {
-  const list = document.getElementById('recentList');
-  const table = document.querySelector('.search-table');
-  [list, table].forEach(el => {
-    if (!el) return;
-    const snapClass = shouldAnimate() ? 'snap' : (shouldReduceMotion() ? 'snap-min' : '');
-    if (!snapClass) return;
-    el.classList.remove('snap', 'snap-min');
-    el.classList.add(snapClass);
-    el.addEventListener('animationend', () => {
-      el.classList.remove(snapClass);
-    }, { once: true });
-  });
-}
-
-function triggerDeleteFeedback(entryId, { playSound: shouldPlay = true } = {}) {
-  if (shouldPlay) playSound(DELETE_SOUND);
-  if (!state.animationsEnabled) return Promise.resolve();
-  const rows = [];
-  const tableRow = document.querySelector(`#searchResults tr[data-id="${entryId}"]`);
-  if (tableRow) rows.push(tableRow);
-  const listRow = document.querySelector(`#recentList li[data-id="${entryId}"]`);
-  if (listRow) rows.push(listRow);
-  const duration = shouldAnimate() ? FX_DURATION : FX_DURATION_REDUCED;
-  rows.forEach(row => {
-    row.classList.remove('delete-sequence', 'delete-sequence-min');
-    row.classList.add(shouldAnimate() ? 'delete-sequence' : 'delete-sequence-min');
-  });
-  animateListsForReflow();
-  return new Promise(resolve => {
-    setTimeout(resolve, duration);
-  });
-}
-
-function createFxLayer() {
-  const layer = document.createElement('div');
-  layer.className = 'fx-layer';
-  document.body.appendChild(layer);
-  return layer;
-}
-
-function cleanupFxLayer(layer, delay) {
-  setTimeout(() => layer.remove(), delay);
+  setTimeout(() => layer.remove(), duration + 50);
 }
 
 function switchTabWithEffects(targetId, { playSound: allowSound, animate } = {}) {
@@ -1226,7 +1156,7 @@ function getTabDirection(tabs, currentId, nextId) {
 
 function applyTabAnimation(panel, direction) {
   panel.classList.remove('arcade-enter', 'arcade-enter-min');
-  panel.style.setProperty('--tab-slide', `${direction * 120}px`);
+  panel.style.setProperty('--tab-slide', `${direction * 60}px`);
   if (shouldAnimate()) {
     panel.classList.add('arcade-enter');
   } else if (shouldReduceMotion()) {
