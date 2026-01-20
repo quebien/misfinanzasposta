@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 const DEFAULT_CURRENCY = '$';
 const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
 CASH_SOUND.preload = 'auto';
@@ -872,14 +872,11 @@ function drawRankChart(canvasId, dataObj, label, color, kind) {
       meta.data.forEach((bar, index) => {
         const value = Number(dataset.data[index]);
         if (!value) return;
-        const text = formatCurrency(value);
+        const text = `${labels[index]} ${formatCurrency(value)}`;
         const textWidth = chart.ctx.measureText(text).width;
-        let x = bar.x - 8 - textWidth;
-        if (x < left + 4) {
-          x = bar.x + 8;
-          if (x + textWidth > right) {
-            x = Math.max(left + 4, right - textWidth - 4);
-          }
+        let x = bar.x + 12;
+        if (x + textWidth > right - 4) {
+          x = Math.max(left + 4, right - textWidth - 4);
         }
         chart.ctx.fillText(text, x, bar.y);
       });
@@ -895,9 +892,14 @@ function drawRankChart(canvasId, dataObj, label, color, kind) {
     options: {
       indexAxis: 'y',
       plugins: { legend: { display: false } },
+      layout: { padding: { left: 0, right: 24 } },
       scales: {
         x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text') } },
-        y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text') } }
+        y: {
+          ticks: { display: false },
+          grid: { display: false },
+          border: { display: false }
+        }
       }
     },
     plugins: [descriptionPlugin]
@@ -969,20 +971,21 @@ function updateBackupInfo() {
   const infoEl = document.getElementById('lastBackupInfo');
   if (!infoEl) return;
   infoEl.textContent = info.text;
-  infoEl.classList.toggle('alert', info.stale);
+  infoEl.classList.remove('ok', 'danger');
+  infoEl.classList.add('backup-status', info.status);
 }
 
 function updateFooterText() {
   const info = getBackupInfo();
   const footer = document.getElementById('footerText');
   if (!footer) return;
-  const backupHtml = info.stale ? `<span class="alert">${info.text}</span>` : info.text;
+  const backupHtml = `<span class="backup-status ${info.status}">${info.text}</span>`;
   footer.innerHTML = `Mis Finanzas Posta versión ${APP_VERSION} · Desarrollado por Andrés B.M. Carizza · ${backupHtml}`;
 }
 
 function getBackupInfo() {
   if (!state.lastBackupAt) {
-    return { text: 'Último backup descargado: todavía no.', stale: false };
+    return { text: 'Último backup descargado: todavía no.', status: 'danger' };
   }
   const last = new Date(state.lastBackupAt);
   const monthAgo = new Date();
@@ -992,7 +995,7 @@ function getBackupInfo() {
   const text = stale
     ? `Último backup descargado: ${formatted} (hace más de un mes)`
     : `Último backup descargado: ${formatted}`;
-  return { text, stale };
+  return { text, status: stale ? 'danger' : 'ok' };
 }
 
 function playCashSound() {

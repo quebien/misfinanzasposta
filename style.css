@@ -201,6 +201,9 @@ footer { text-align: center; color: var(--muted); padding: 16px; }
 
 .optional { color: var(--muted); }
 .muted { color: var(--muted); }
+.backup-status { font-size: 12px; font-weight: 600; }
+.backup-status.ok { color: var(--accent); }
+.backup-status.danger { color: var(--danger); }
 .hidden { display: none; }
 
 .section-title { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; }
