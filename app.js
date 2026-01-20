@@ -198,6 +198,9 @@ function setTodayDefaults() {
 }
 
 function addEntriesFromForm(form, type) {
+  const card = form.closest('.form-card');
+  const cardRect = card?.getBoundingClientRect();
+  const buttonRect = form.querySelector('button[type="submit"]')?.getBoundingClientRect();
   const data = new FormData(form);
   const description = data.get('description').trim();
   const amount = Number(data.get('amount'));
@@ -484,6 +487,7 @@ function renderDashboard() {
     const amount = document.createElement('span');
     amount.className = 'amount ' + (entry.type === 'expense' ? 'negative' : 'positive');
     amount.textContent = (entry.type === 'expense' ? '-' : '+') + formatCurrency(entry.amount, currency);
+    li.dataset.id = entry.id;
     li.append(left, amount);
     li.addEventListener('click', () => openEntryFromShortcut(entry.id));
     recentList.appendChild(li);
@@ -663,9 +667,11 @@ function updateBatchDeleteButton(entry) {
   btn.textContent = siblings.length > 1 ? `Borrar lote (${siblings.length})` : 'Borrar lote';
 }
 
-function handleDeleteEntry() {
+async function handleDeleteEntry() {
   if (!selectedEntryId) return;
   if (!confirm('¿Seguro que querés borrar este registro?')) return;
+  const entryId = selectedEntryId;
+  await triggerDeleteFeedback(entryId);
   state.entries = state.entries.filter(e => e.id !== selectedEntryId);
   saveState();
   selectedEntryId = null;
@@ -674,13 +680,14 @@ function handleDeleteEntry() {
   showMessage('Registro eliminado.', 'success');
 }
 
-function handleDeleteBatch() {
+async function handleDeleteBatch() {
   const btn = document.getElementById('deleteBatch');
   const batchId = btn?.dataset.batchId;
   if (!batchId) return;
   const related = state.entries.filter(e => e.batchId === batchId);
   if (!related.length) return;
   if (!confirm(`¿Seguro que querés borrar los ${related.length} registros de este lote?`)) return;
+  await Promise.all(related.map((entry, index) => triggerDeleteFeedback(entry.id, { playSound: index === 0 })));
   state.entries = state.entries.filter(e => e.batchId !== batchId);
   saveState();
   selectedEntryId = null;
