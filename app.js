@@ -1,9 +1,20 @@
 const STORAGE_KEY = 'misfinanzas-posta-data';
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.6.0';
 const DEFAULT_CURRENCY = '$';
-const CASH_SOUND = new Audio('cash-register-kaching-sound-effect-125042.mp3');
-CASH_SOUND.preload = 'auto';
-CASH_SOUND.volume = 0.4;
+const INCOME_SOUND = new Audio('income_pop.mp3');
+const EXPENSE_SOUND = new Audio('expense_store.mp3');
+const TAB_SOUND = new Audio('tab_switch.mp3');
+const DELETE_SOUND = new Audio('delete_record.mp3');
+const SOUND_VOLUME = 0.45;
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let prefersReducedMotion = motionQuery.matches;
+
+[INCOME_SOUND, EXPENSE_SOUND, TAB_SOUND, DELETE_SOUND].forEach(sound => {
+  sound.preload = 'auto';
+  sound.volume = SOUND_VOLUME;
+});
+const FX_DURATION = 1750;
+const FX_DURATION_REDUCED = 260;
 
 function normalizeEntry(entry) {
   return {
@@ -23,6 +34,7 @@ function init() {
   bindTabs();
   bindForms();
   bindControls();
+  setupMotionPreference();
   applyTheme(state.theme || 'light');
   applyAnimationPreference();
   document.getElementById('themeToggle').checked = state.theme === 'dark';
@@ -99,16 +111,8 @@ function shiftDays(date, delta) {
 function bindTabs() {
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.target).classList.add('active');
-      if (btn.dataset.target === 'dashboard') {
-        renderMonth();
-        renderDashboard();
-      }
+      switchTab(btn.dataset.target, { playSound: true, animate: true });
       if (btn.dataset.target === 'search') {
-        focusSearchInput();
         selectedEntryId = null;
         document.getElementById('entryEditor').classList.add('hidden');
       }
@@ -197,6 +201,9 @@ function setTodayDefaults() {
 }
 
 function addEntriesFromForm(form, type) {
+  const card = form.closest('.form-card');
+  const cardRect = card?.getBoundingClientRect();
+  const buttonRect = form.querySelector('button[type="submit"]')?.getBoundingClientRect();
   const data = new FormData(form);
   const description = data.get('description').trim();
   const amount = Number(data.get('amount'));
@@ -245,7 +252,7 @@ function addEntriesFromForm(form, type) {
   if (categorySelect) categorySelect.value = '';
   refreshUI();
   showMessage(entriesToAdd.length > 1 ? `${entriesToAdd.length} movimientos guardados con éxito.` : 'Movimiento guardado con éxito.', 'success');
-  if (type === 'income') playCashSound();
+  triggerEntryFeedback(type, { cardRect, buttonRect });
 }
 
 function createEntry({ type, description, amount, date, category, notes, batchId = '' }) {
@@ -483,6 +490,7 @@ function renderDashboard() {
     const amount = document.createElement('span');
     amount.className = 'amount ' + (entry.type === 'expense' ? 'negative' : 'positive');
     amount.textContent = (entry.type === 'expense' ? '-' : '+') + formatCurrency(entry.amount, currency);
+    li.dataset.id = entry.id;
     li.append(left, amount);
     li.addEventListener('click', () => openEntryFromShortcut(entry.id));
     recentList.appendChild(li);
@@ -662,9 +670,11 @@ function updateBatchDeleteButton(entry) {
   btn.textContent = siblings.length > 1 ? `Borrar lote (${siblings.length})` : 'Borrar lote';
 }
 
-function handleDeleteEntry() {
+async function handleDeleteEntry() {
   if (!selectedEntryId) return;
   if (!confirm('¿Seguro que querés borrar este registro?')) return;
+  const entryId = selectedEntryId;
+  await triggerDeleteFeedback(entryId);
   state.entries = state.entries.filter(e => e.id !== selectedEntryId);
   saveState();
   selectedEntryId = null;
@@ -673,13 +683,14 @@ function handleDeleteEntry() {
   showMessage('Registro eliminado.', 'success');
 }
 
-function handleDeleteBatch() {
+async function handleDeleteBatch() {
   const btn = document.getElementById('deleteBatch');
   const batchId = btn?.dataset.batchId;
   if (!batchId) return;
   const related = state.entries.filter(e => e.batchId === batchId);
   if (!related.length) return;
   if (!confirm(`¿Seguro que querés borrar los ${related.length} registros de este lote?`)) return;
+  await Promise.all(related.map((entry, index) => triggerDeleteFeedback(entry.id, { playSound: index === 0 })));
   state.entries = state.entries.filter(e => e.batchId !== batchId);
   saveState();
   selectedEntryId = null;
@@ -694,18 +705,8 @@ function openEntryFromShortcut(entryId) {
   openEditor(entryId);
 }
 
-function switchTab(targetId) {
-  document.querySelectorAll('.tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.target === targetId);
-  });
-  document.querySelectorAll('.panel').forEach(p => {
-    p.classList.toggle('active', p.id === targetId);
-  });
-  if (targetId === 'search') focusSearchInput();
-  if (targetId === 'dashboard') {
-    renderMonth();
-    renderDashboard();
-  }
+function switchTab(targetId, options = { playSound: true, animate: true }) {
+  switchTabWithEffects(targetId, options);
 }
 
 function focusSearchInput() {
@@ -998,14 +999,242 @@ function getBackupInfo() {
   return { text, status: stale ? 'danger' : 'ok' };
 }
 
-function playCashSound() {
-  if (!state.soundEnabled) return;
-  CASH_SOUND.currentTime = 0;
-  CASH_SOUND.play().catch(() => {});
-}
-
 function applyAnimationPreference() {
   document.body.classList.toggle('animations-enabled', !!state.animationsEnabled);
+  document.body.classList.toggle('reduced-motion', prefersReducedMotion);
+}
+
+function setupMotionPreference() {
+  const updatePreference = () => {
+    prefersReducedMotion = motionQuery.matches;
+    applyAnimationPreference();
+  };
+  updatePreference();
+  if (motionQuery.addEventListener) {
+    motionQuery.addEventListener('change', updatePreference);
+  } else {
+    motionQuery.addListener(updatePreference);
+  }
+}
+
+function shouldAnimate() {
+  return state.animationsEnabled && !prefersReducedMotion;
+}
+
+function shouldReduceMotion() {
+  return state.animationsEnabled && prefersReducedMotion;
+}
+
+function playSound(sound) {
+  if (!state.soundEnabled) return;
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
+}
+
+function triggerEntryFeedback(type, info = {}) {
+  if (type === 'income') {
+    playSound(INCOME_SOUND);
+    triggerIncomeCelebration(info);
+  } else {
+    playSound(EXPENSE_SOUND);
+    triggerExpenseStore(info);
+  }
+}
+
+function triggerIncomeCelebration({ cardRect, buttonRect } = {}) {
+  if (!state.animationsEnabled) return;
+  if (shouldAnimate()) {
+    const rect = cardRect || document.querySelector('#incomeForm')?.closest('.form-card')?.getBoundingClientRect();
+    const origin = buttonRect || document.querySelector('#incomeForm button[type="submit"]')?.getBoundingClientRect();
+    if (rect) {
+      launchConfetti(rect, origin || rect);
+      launchIncomeGlow(rect);
+    }
+  }
+  pulseTotals(['monthIncome', 'monthBalance'], shouldReduceMotion());
+}
+
+function triggerExpenseStore({ cardRect } = {}) {
+  if (!state.animationsEnabled) return;
+  if (shouldAnimate()) {
+    const rect = cardRect || document.querySelector('#expenseForm')?.closest('.form-card')?.getBoundingClientRect();
+    if (rect) {
+      launchExpenseStore(rect);
+    }
+  }
+  animateListsForReflow();
+}
+
+function pulseTotals(ids, reduced) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('pulse-pop', 'pulse-pop-min');
+    el.classList.add(reduced ? 'pulse-pop-min' : 'pulse-pop');
+    el.addEventListener('animationend', () => {
+      el.classList.remove('pulse-pop', 'pulse-pop-min');
+    }, { once: true });
+  });
+}
+
+function launchConfetti(cardRect, originRect) {
+  const layer = createFxLayer();
+  layer.classList.add('income-burst');
+  const origin = {
+    x: originRect.left + originRect.width / 2,
+    y: originRect.top + originRect.height / 2
+  };
+  const colors = ['#16a34a', '#22d3a6', '#7c9dff', '#facc15', '#fb7185', '#a855f7'];
+  const particleCount = 26;
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('span');
+    particle.className = 'confetti';
+    const angle = (Math.PI * 2 * i) / particleCount;
+    const distance = 180 + Math.random() * 140;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance * 0.6 - 90;
+    particle.style.setProperty('--fx-x', `${dx}px`);
+    particle.style.setProperty('--fx-y', `${dy}px`);
+    particle.style.setProperty('--fx-delay', `${Math.random() * 120}ms`);
+    particle.style.setProperty('--fx-rotate', `${Math.random() * 260 - 130}deg`);
+    particle.style.left = `${origin.x}px`;
+    particle.style.top = `${origin.y}px`;
+    particle.style.background = colors[i % colors.length];
+    particle.style.width = `${14 + Math.random() * 10}px`;
+    particle.style.height = `${14 + Math.random() * 10}px`;
+    layer.appendChild(particle);
+  }
+  const spotlight = document.createElement('span');
+  spotlight.className = 'income-spotlight';
+  spotlight.style.left = `${cardRect.left + cardRect.width / 2}px`;
+  spotlight.style.top = `${cardRect.top + cardRect.height / 2}px`;
+  layer.appendChild(spotlight);
+  cleanupFxLayer(layer, FX_DURATION + 200);
+}
+
+function launchIncomeGlow(cardRect) {
+  const layer = createFxLayer();
+  const glow = document.createElement('div');
+  glow.className = 'income-glow';
+  glow.style.left = `${cardRect.left + cardRect.width / 2}px`;
+  glow.style.top = `${cardRect.top + cardRect.height / 2}px`;
+  layer.appendChild(glow);
+  cleanupFxLayer(layer, FX_DURATION + 200);
+}
+
+function launchExpenseStore(cardRect) {
+  const layer = createFxLayer();
+  layer.classList.add('expense-store-layer');
+  const ghost = document.createElement('div');
+  ghost.className = 'expense-ghost';
+  ghost.style.left = `${cardRect.left}px`;
+  ghost.style.top = `${cardRect.top}px`;
+  ghost.style.width = `${cardRect.width}px`;
+  ghost.style.height = `${cardRect.height}px`;
+  layer.appendChild(ghost);
+  const folder = document.createElement('div');
+  folder.className = 'expense-folder';
+  const folderX = cardRect.left + cardRect.width * 0.72;
+  const folderY = cardRect.top + cardRect.height * 0.9;
+  folder.style.left = `${folderX}px`;
+  folder.style.top = `${folderY}px`;
+  layer.appendChild(folder);
+  const trails = document.createElement('div');
+  trails.className = 'expense-trails';
+  trails.style.left = `${cardRect.left + cardRect.width / 2}px`;
+  trails.style.top = `${cardRect.top + cardRect.height / 2}px`;
+  layer.appendChild(trails);
+  cleanupFxLayer(layer, FX_DURATION + 250);
+}
+
+function animateListsForReflow() {
+  const list = document.getElementById('recentList');
+  const table = document.querySelector('.search-table');
+  [list, table].forEach(el => {
+    if (!el) return;
+    const snapClass = shouldAnimate() ? 'snap' : (shouldReduceMotion() ? 'snap-min' : '');
+    if (!snapClass) return;
+    el.classList.remove('snap', 'snap-min');
+    el.classList.add(snapClass);
+    el.addEventListener('animationend', () => {
+      el.classList.remove(snapClass);
+    }, { once: true });
+  });
+}
+
+function triggerDeleteFeedback(entryId, { playSound: shouldPlay = true } = {}) {
+  if (shouldPlay) playSound(DELETE_SOUND);
+  if (!state.animationsEnabled) return Promise.resolve();
+  const rows = [];
+  const tableRow = document.querySelector(`#searchResults tr[data-id="${entryId}"]`);
+  if (tableRow) rows.push(tableRow);
+  const listRow = document.querySelector(`#recentList li[data-id="${entryId}"]`);
+  if (listRow) rows.push(listRow);
+  const duration = shouldAnimate() ? FX_DURATION : FX_DURATION_REDUCED;
+  rows.forEach(row => {
+    row.classList.remove('delete-sequence', 'delete-sequence-min');
+    row.classList.add(shouldAnimate() ? 'delete-sequence' : 'delete-sequence-min');
+  });
+  animateListsForReflow();
+  return new Promise(resolve => {
+    setTimeout(resolve, duration);
+  });
+}
+
+function createFxLayer() {
+  const layer = document.createElement('div');
+  layer.className = 'fx-layer';
+  document.body.appendChild(layer);
+  return layer;
+}
+
+function cleanupFxLayer(layer, delay) {
+  setTimeout(() => layer.remove(), delay);
+}
+
+function switchTabWithEffects(targetId, { playSound: allowSound, animate } = {}) {
+  const panels = Array.from(document.querySelectorAll('.panel'));
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const currentPanel = document.querySelector('.panel.active');
+  const currentId = currentPanel?.id;
+  if (currentId === targetId) return;
+  const nextPanel = document.getElementById(targetId);
+  if (!nextPanel) return;
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.target === targetId));
+  panels.forEach(p => p.classList.toggle('active', p.id === targetId));
+  if (animate && state.animationsEnabled) {
+    const direction = getTabDirection(tabs, currentId, targetId);
+    applyTabAnimation(nextPanel, direction);
+  }
+  if (allowSound) {
+    playSound(TAB_SOUND);
+  }
+  if (targetId === 'search') focusSearchInput();
+  if (targetId === 'dashboard') {
+    renderMonth();
+    renderDashboard();
+  }
+}
+
+function getTabDirection(tabs, currentId, nextId) {
+  const getIndex = id => tabs.findIndex(tab => tab.dataset.target === id);
+  const currentIndex = currentId ? getIndex(currentId) : 0;
+  const nextIndex = getIndex(nextId);
+  if (nextIndex === -1) return 1;
+  return nextIndex >= currentIndex ? 1 : -1;
+}
+
+function applyTabAnimation(panel, direction) {
+  panel.classList.remove('arcade-enter', 'arcade-enter-min');
+  panel.style.setProperty('--tab-slide', `${direction * 120}px`);
+  if (shouldAnimate()) {
+    panel.classList.add('arcade-enter');
+  } else if (shouldReduceMotion()) {
+    panel.classList.add('arcade-enter-min');
+  }
+  panel.addEventListener('animationend', () => {
+    panel.classList.remove('arcade-enter', 'arcade-enter-min');
+  }, { once: true });
 }
 
 function alignRecentList(listEl) {
